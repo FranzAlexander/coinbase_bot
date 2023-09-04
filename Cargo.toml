@@ -1,0 +1,21 @@
+[package]
+name = "coinbase"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "*", features = ["tls"] }
+url = "*"
+futures = "*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+dotenv="*"
+sha2="*"
+hmac="*"
+chrono = { version = "*", features = ["serde"] }
+hex="*"
+rust_decimal = {version = "*", features = ["maths"]}
+rust_decimal_macros = "*"
