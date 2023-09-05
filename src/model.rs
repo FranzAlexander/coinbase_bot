@@ -4,20 +4,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Trade {
-    trade_id: String,
-    product_id: String,
-    price: Decimal,
-    size: Decimal,
-    side: String,
-    time: DateTime<Utc>,
+    pub trade_id: String,
+    pub product_id: String,
+    pub price: Decimal,
+    pub size: Decimal,
+    pub side: String,
+    pub time: DateTime<Utc>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct OneMinuteCandle {
-    open: Decimal,
-    high: Decimal,
-    low: Decimal,
-    close: Decimal,
-    volume: Decimal,
-    start_time: DateTime<Utc>,
+    pub open: Option<Decimal>,
+    pub high: Option<Decimal>,
+    pub low: Option<Decimal>,
+    pub close: Option<Decimal>,
+    pub volume: Decimal,
+    pub start_time: Option<DateTime<Utc>>,
+    pub end_time: Option<DateTime<Utc>>,
 }

@@ -19,3 +19,4 @@ chrono = { version = "*", features = ["serde"] }
 hex="*"
 rust_decimal = {version = "*", features = ["maths"]}
 rust_decimal_macros = "*"
+rayon = "*"
