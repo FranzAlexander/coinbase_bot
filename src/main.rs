@@ -189,6 +189,8 @@ fn update_candle_with_trade(
         println!("Completed Candle: {:?}", current_candle);
         let complete_candle = current_candle.clone();
         bot_indicator.send_to_processing(indicators::IndicatorType::Candlestick(complete_candle));
+        bot_indicator.check_signal();
+
         *current_candle = OneMinuteCandle::default();
     }
 }

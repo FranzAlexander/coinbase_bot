@@ -20,3 +20,6 @@ hex="*"
 rust_decimal = {version = "*", features = ["maths"]}
 rust_decimal_macros = "*"
 rayon = "*"
+
+[profile.dev]
+debug = true
