@@ -26,27 +26,30 @@ impl Rsi {
     }
 
     pub fn update(&mut self, close_price: Decimal) {
-        match self.prev_price {
-            Some(prev) => {
-                let (gain, loss) = self.caluclate_gain_loss(prev, close_price);
+        if let Some(prev) = self.prev_price {
+            let (gain, loss) = self.calculate_gain_loss(prev, close_price);
 
-                self.update_avg_gain_loss(gain, loss);
-
-                if self.count < self.period {
-                    self.count += 1;
-                } else {
-                    self.caluclate_rsi(gain, loss);
+            if self.count < self.period {
+                self.update_initial_avg_gain_loss(gain, loss);
+                self.count += 1;
+            } else {
+                if self.count == self.period {
+                    // This transforms the initial average to be correctly based on the period.
+                    self.avg_gain *= Decimal::from(self.period);
+                    self.avg_loss *= Decimal::from(self.period);
                 }
-            }
-            None => {
+
+                self.calculate_rsi(gain, loss);
                 self.count += 1;
             }
+        } else {
+            self.count += 1;
         }
 
         self.prev_price = Some(close_price);
     }
 
-    fn caluclate_gain_loss(&self, prev: Decimal, close_price: Decimal) -> (Decimal, Decimal) {
+    fn calculate_gain_loss(&self, prev: Decimal, close_price: Decimal) -> (Decimal, Decimal) {
         let gain = if close_price > prev {
             close_price - prev
         } else {
@@ -60,14 +63,14 @@ impl Rsi {
         (gain, loss)
     }
 
-    fn update_avg_gain_loss(&mut self, gain: Decimal, loss: Decimal) {
+    fn update_initial_avg_gain_loss(&mut self, gain: Decimal, loss: Decimal) {
         self.avg_gain =
             (self.avg_gain * Decimal::from(self.count) + gain) / Decimal::from(self.count + 1);
         self.avg_loss =
             (self.avg_loss * Decimal::from(self.count) + loss) / Decimal::from(self.count + 1);
     }
 
-    fn caluclate_rsi(&mut self, gain: Decimal, loss: Decimal) {
+    fn calculate_rsi(&mut self, gain: Decimal, loss: Decimal) {
         self.avg_gain =
             (self.avg_gain * Decimal::from(self.period - 1) + gain) / Decimal::from(self.period);
         self.avg_loss =

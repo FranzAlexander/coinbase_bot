@@ -27,14 +27,12 @@ impl Macd {
         self.short_ema.update(value);
         self.long_ema.update(value);
 
-        let short_ema = self.short_ema.get_current_ema();
-        let long_ema = self.long_ema.get_current_ema();
-
-        if short_ema.is_some() && long_ema.is_some() {
-            self.current_macd = Some(short_ema.unwrap() - long_ema.unwrap());
+        if let (Some(short_val), Some(long_val)) = (
+            self.short_ema.get_current_ema(),
+            self.long_ema.get_current_ema(),
+        ) {
+            self.current_macd = Some(short_val - long_val);
             self.signal_ema.update(self.current_macd.unwrap());
-        } else {
-            return;
         }
     }
 
