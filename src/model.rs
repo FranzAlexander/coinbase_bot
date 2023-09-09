@@ -1,24 +1,123 @@
 use chrono::{DateTime, Utc};
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TradeSide {
+    BUY,
+    SELL,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Trade {
     pub trade_id: String,
     pub product_id: String,
-    pub price: Decimal,
-    pub size: Decimal,
-    pub side: String,
+    #[serde(with = "string_or_float")]
+    pub price: f64,
+    #[serde(with = "string_or_float")]
+    pub size: f64,
+    pub side: TradeSide,
     pub time: DateTime<Utc>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TradeMessage {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub trades: Vec<Trade>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HeartbeatMessage {
+    current_time: DateTime<Utc>,
+    heartbeat_counter: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum EventType {
+    #[serde(rename = "trade_event")]
+    TradeEvent(TradeMessage),
+    #[serde(rename = "heartbeat")]
+    Heartbeat(HeartbeatMessage),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Message {
+    pub channel: String,
+    pub client_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub sequence_num: u64,
+    pub events: Vec<EventType>,
+}
+
+#[derive(Debug)]
 pub struct OneMinuteCandle {
-    pub open: Option<Decimal>,
-    pub high: Option<Decimal>,
-    pub low: Option<Decimal>,
-    pub close: Option<Decimal>,
-    pub volume: Decimal,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
+    pub open: f64,
+    pub close: f64,
+    pub high: f64,
+    pub low: f64,
+    pub volume: f64,
+}
+
+impl OneMinuteCandle {
+    pub fn from_trades(trades: &[Trade]) -> Self {
+        let open = trades.first().unwrap().price;
+        let close = trades.last().unwrap().price;
+
+        let high = trades
+            .iter()
+            .map(|trade| trade.price)
+            .fold(f64::MIN, f64::max);
+        let low = trades
+            .iter()
+            .map(|trade| trade.price)
+            .fold(f64::MAX, f64::min);
+
+        let volume = trades.iter().map(|trade| trade.size).sum(); // Compute total volume
+
+        OneMinuteCandle {
+            open,
+            close,
+            high,
+            low,
+            volume,
+        }
+    }
+}
+
+pub(crate) mod string_or_float {
+    use std::fmt;
+
+    use serde::{de, Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: fmt::Display,
+        S: Serializer,
+    {
+        serializer.collect_str(value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrFloat {
+            String(String),
+            Float(f64),
+        }
+
+        match StringOrFloat::deserialize(deserializer)? {
+            StringOrFloat::String(s) => {
+                if s == "INF" {
+                    Ok(f64::INFINITY)
+                } else {
+                    s.parse().map_err(de::Error::custom)
+                }
+            }
+            StringOrFloat::Float(i) => Ok(i),
+        }
+    }
 }

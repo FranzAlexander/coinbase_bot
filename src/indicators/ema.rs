@@ -1,45 +1,41 @@
-use rust_decimal::{prelude::FromPrimitive, Decimal};
-use rust_decimal_macros::dec;
-
 pub struct Ema {
     period: usize,
-    alpha: Decimal,
-    total: Decimal,
+    k: f64,
+    prev_ema: Option<f64>,
+    accumulated_sum: f64,
     count: usize,
-    prev_ema: Option<Decimal>,
 }
 
 impl Ema {
     pub fn new(period: usize) -> Self {
-        let alpha = Decimal::from_f64(2.0 / (period as f64 + 1.0)).unwrap();
-        Self {
+        let k = 2.0_f64 / (period as f64 + 1.0_f64);
+        Ema {
             period,
-            alpha,
-            total: dec!(0.0),
-            count: 0,
+            k,
             prev_ema: None,
+            accumulated_sum: 0_f64,
+            count: 0,
         }
     }
 
-    pub fn update(&mut self, value: Decimal) {
+    pub fn update(&mut self, new_price: f64) {
         if self.count < self.period {
-            self.total += value;
+            self.accumulated_sum += new_price;
             self.count += 1;
-
-            if self.count == self.period {
-                self.prev_ema = Some(self.total / Decimal::from_usize(self.period).unwrap())
-            }
-
             return;
         }
 
-        if let Some(prev_ema) = self.prev_ema {
-            let ema = (value * self.alpha) + prev_ema * (dec!(1.0) - self.alpha);
-            self.prev_ema = Some(ema);
+        if self.prev_ema.is_none() {
+            let sma = self.accumulated_sum / self.period as f64;
+            self.prev_ema = Some(sma);
+        } else {
+            let ema_value =
+                ((new_price - self.prev_ema.unwrap()) * self.k) + self.prev_ema.unwrap();
+            self.prev_ema = Some(ema_value);
         }
     }
 
-    pub fn get_current_ema(&self) -> Option<Decimal> {
+    pub fn get_ema(&self) -> Option<f64> {
         self.prev_ema
     }
 }

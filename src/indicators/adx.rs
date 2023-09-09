@@ -1,141 +1,108 @@
-use rust_decimal::{
-    prelude::{FromPrimitive, Zero},
-    Decimal,
-};
-use rust_decimal_macros::dec;
-use std::collections::VecDeque;
-
 pub struct Adx {
     period: usize,
-    prev_close: Option<Decimal>,
-    prev_high: Option<Decimal>,
-    prev_low: Option<Decimal>,
-    tr_values: VecDeque<Decimal>,
-    positive_dm_values: VecDeque<Decimal>,
-    negative_dm_values: VecDeque<Decimal>,
-    smoothed_tr: Option<Decimal>,
-    smoothed_positive_dm: Option<Decimal>,
-    smoothed_negative_dm: Option<Decimal>,
-    dx_values: VecDeque<Decimal>,
-    adx: Option<Decimal>,
+    prev_close: Option<f64>,
+    prev_high: f64,
+    prev_low: f64,
+    tr: f64,
+    pos_dm: f64,
+    neg_dm: f64,
+    atr: f64,
+    pos_di: f64,
+    neg_di: f64,
+    adx: f64,
 }
 
 impl Adx {
     pub fn new(period: usize) -> Self {
-        Adx {
+        Self {
             period,
             prev_close: None,
-            prev_high: None,
-            prev_low: None,
-            tr_values: VecDeque::with_capacity(period),
-            positive_dm_values: VecDeque::with_capacity(period),
-            negative_dm_values: VecDeque::with_capacity(period),
-            smoothed_tr: None,
-            smoothed_positive_dm: None,
-            smoothed_negative_dm: None,
-            dx_values: VecDeque::with_capacity(period),
-            adx: None,
+            prev_high: 0_f64,
+            prev_low: 0_f64,
+            tr: 0_f64,
+            pos_dm: 0.0,
+            neg_dm: 0.0,
+            atr: 0.0,
+            pos_di: 0.0,
+            neg_di: 0.0,
+            adx: 0.0,
         }
     }
 
-    pub fn update(&mut self, current_high: Decimal, current_low: Decimal, current_close: Decimal) {
-        let tr = self
-            .true_range(current_high, current_low, current_close)
-            .unwrap();
-        let (positive_dm, negative_dm) = self.directional_movements(current_high, current_low);
+    pub fn update(&mut self, current_high: f64, current_low: f64, current_close: f64) {
+        let tr = self.true_range(&current_high, &current_low);
+        let (pd, nd) = self.direction_movement(&current_high, &current_low);
 
-        self.tr_values.push_back(tr);
-        self.positive_dm_values
-            .push_back(positive_dm.unwrap_or_else(Decimal::zero));
-        self.negative_dm_values
-            .push_back(negative_dm.unwrap_or_else(Decimal::zero));
-
-        if self.tr_values.len() > self.period {
-            self.tr_values.pop_front();
-            self.positive_dm_values.pop_front();
-            self.negative_dm_values.pop_front();
+        if self.prev_close.is_none() {
+            self.initialize(tr, pd, nd, current_close);
+        } else {
+            self.tr = ((self.tr * (self.period as f64 - 1.0_f64)) + tr) / self.period as f64;
+            self.pos_dm =
+                ((self.pos_dm * (self.period as f64 - 1.0_f64)) + pd) / self.period as f64;
+            self.neg_dm =
+                ((self.neg_dm * (self.period as f64 - 1.0_f64)) + nd) / self.period as f64;
         }
 
-        self.smoothed_tr = Some(self.smooth(self.smoothed_tr, &self.tr_values));
-        self.smoothed_positive_dm =
-            Some(self.smooth(self.smoothed_positive_dm, &self.positive_dm_values));
-        self.smoothed_negative_dm =
-            Some(self.smooth(self.smoothed_negative_dm, &self.negative_dm_values));
+        self.atr = self.tr;
+        self.pos_di = (self.pos_dm / self.atr) * 100.0_f64;
+        self.neg_di = (self.neg_dm / self.atr) * 100.0_f64;
 
-        let positive_di = self.smoothed_positive_dm.unwrap_or_else(Decimal::zero)
-            * Decimal::from_usize(100).unwrap()
-            / self.smoothed_tr.unwrap_or_else(Decimal::zero);
-        let negative_di = self.smoothed_negative_dm.unwrap_or_else(Decimal::zero)
-            * Decimal::from_usize(100).unwrap()
-            / self.smoothed_tr.unwrap_or_else(Decimal::zero);
+        let dx = ((self.pos_di - self.neg_di).abs()) / (self.pos_di + self.neg_di) * 100.0_f64;
+        self.calculate_adx(dx);
 
-        let dx = dec!(100.0) * (positive_di - negative_di).abs() / (positive_di + negative_di);
-        self.dx_values.push_back(dx);
-
-        if self.dx_values.len() > self.period {
-            self.dx_values.pop_front();
-        }
-
-        self.adx = Some(self.smooth(self.adx, &self.dx_values));
-
-        // Update previous values at the end of the update method
+        // Update previous values
+        self.prev_high = current_high;
+        self.prev_low = current_low;
         self.prev_close = Some(current_close);
-        self.prev_high = Some(current_high);
-        self.prev_low = Some(current_low);
     }
 
-    fn true_range(
-        &mut self,
-        current_high: Decimal,
-        current_low: Decimal,
-        current_close: Decimal,
-    ) -> Option<Decimal> {
+    fn true_range(&self, current_high: &f64, current_low: &f64) -> f64 {
         if let Some(prev_close) = self.prev_close {
-            let range1 = current_high - current_low;
-            let range2 = (current_high - prev_close).abs();
-            let range3 = (current_low - prev_close).abs();
-            Some(range1.max(range2).max(range3))
+            let high_low = current_high - current_low;
+            let high_close = (current_high - prev_close).abs();
+            let low_close = (current_low - prev_close).abs();
+
+            high_low.max(high_close).max(low_close)
         } else {
-            self.prev_close = Some(current_close);
-            None
+            0.0_f64
         }
     }
 
-    fn directional_movements(
-        &mut self,
-        current_high: Decimal,
-        current_low: Decimal,
-    ) -> (Option<Decimal>, Option<Decimal>) {
-        if let (Some(prev_high), Some(prev_low)) = (self.prev_high, self.prev_low) {
-            let up_move = current_high - prev_high;
-            let down_move = prev_low - current_low;
+    fn direction_movement(&self, current_high: &f64, current_low: &f64) -> (f64, f64) {
+        let high_diff = current_high - self.prev_high;
+        let low_diff = self.prev_low - current_low;
 
-            if up_move > down_move && up_move > Decimal::zero() {
-                (Some(up_move), None)
-            } else if down_move > up_move && down_move > Decimal::zero() {
-                (None, Some(down_move))
-            } else {
-                (None, None)
-            }
+        let mut h_diff = 0.0;
+        let mut l_diff = 0.0;
+
+        if high_diff > 0.0 && high_diff > low_diff {
+            h_diff = high_diff;
+        }
+
+        if low_diff > 0.0 && low_diff > high_diff {
+            l_diff = low_diff;
+        }
+
+        (h_diff, l_diff)
+    }
+
+    fn initialize(&mut self, tr: f64, pd: f64, nd: f64, current_close: f64) {
+        self.tr = tr;
+        self.pos_dm = pd;
+        self.neg_dm = nd;
+        self.prev_close = Some(current_close);
+    }
+
+    fn calculate_adx(&mut self, dx: f64) {
+        if self.adx == 0.0_f64 {
+            self.adx = dx;
         } else {
-            self.prev_high = Some(current_high);
-            self.prev_low = Some(current_low);
-            (None, None)
+            // Apply Wilder's Smoothing for ADX
+            self.adx = ((self.adx * (self.period as f64 - 1.0_f64)) + dx) / self.period as f64;
         }
     }
 
-    fn smooth(&self, prev_smoothed: Option<Decimal>, values: &VecDeque<Decimal>) -> Decimal {
-        if let Some(prev) = prev_smoothed {
-            prev - (prev / Decimal::from_usize(self.period).unwrap())
-                + values.back().unwrap_or(&Decimal::zero()).clone()
-        } else if values.len() == self.period {
-            values.iter().cloned().sum()
-        } else {
-            Decimal::zero()
-        }
-    }
-
-    pub fn get_adx(&self) -> Option<Decimal> {
+    pub fn get_adx(&self) -> f64 {
         self.adx
     }
 }
