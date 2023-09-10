@@ -1,10 +1,41 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub enum Channel {
+    Heartbeats,
+    MarketTrades,
+    L2Data,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub enum TradeSide {
-    BUY,
-    SELL,
+pub struct Heartbeat {
+    pub channel: String,
+    client_id: String,
+    timestamp: DateTime<Utc>,
+    sequence_num: u32,
+    events: Vec<HeartbeatEvent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HeartbeatEvent {
+    current_time: DateTime<Utc>,
+    heartbeat_counter: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MarketTrade {
+    pub channel: String,
+    client_id: String,
+    timestamp: DateTime<Utc>,
+    sequence_num: u32,
+    events: Vec<MarketTradeEvent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MarketTradeEvent {
+    #[serde(rename = "type")]
+    event_type: String,
+    pub trades: Vec<Trade>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,6 +48,12 @@ pub struct Trade {
     pub size: f64,
     pub side: TradeSide,
     pub time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TradeSide {
+    BUY,
+    SELL,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,18 +73,9 @@ pub struct HeartbeatMessage {
 #[serde(tag = "type")]
 pub enum EventType {
     #[serde(rename = "trade_event")]
-    TradeEvent(TradeMessage),
+    TradeEvent(MarketTrade),
     #[serde(rename = "heartbeat")]
-    Heartbeat(HeartbeatMessage),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Message {
-    pub channel: String,
-    pub client_id: String,
-    pub timestamp: DateTime<Utc>,
-    pub sequence_num: u64,
-    pub events: Vec<EventType>,
+    Heartbeat(Heartbeat),
 }
 
 #[derive(Debug)]
