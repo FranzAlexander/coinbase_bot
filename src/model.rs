@@ -1,44 +1,82 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{de::Error as DeError, Deserialize};
 
-pub enum Channel {
-    Heartbeats,
-    MarketTrades,
-    L2Data,
+// Common fields for all the messages
+#[derive(Debug, Deserialize)]
+pub struct CommonFields {
+    pub channel: String,
+    pub client_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub sequence_num: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Heartbeat {
-    pub channel: String,
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionMessage {
+    channel: String,
     client_id: String,
     timestamp: DateTime<Utc>,
     sequence_num: u32,
+    events: Vec<serde_json::Value>, // Use a generic Value type for now.
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HeartbeatMessage {
+    channel: String,
+    client_id: String,
+    timestamp: String, // or use chrono::NaiveDateTime if you're using the `chrono` crate
+    sequence_num: u64,
     events: Vec<HeartbeatEvent>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct HeartbeatEvent {
-    current_time: DateTime<Utc>,
-    heartbeat_counter: u32,
+    current_time: String, // or use chrono::NaiveDateTime
+    heartbeat_counter: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MarketTrade {
+// For the Subscriptions channel
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionDetail {
+    pub heartbeats: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionEvent {
+    pub subscriptions: SubscriptionDetail,
+}
+
+// Event enum
+#[derive(Debug)]
+pub enum Event {
+    Subscriptions(SubscriptionMessage),
+    Heartbeats(HeartbeatMessage),
+    MarketTrades(MarketTradesMessage),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum TradeSide {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct MarketTradesMessage {
     pub channel: String,
-    client_id: String,
-    timestamp: DateTime<Utc>,
-    sequence_num: u32,
-    events: Vec<MarketTradeEvent>,
+    pub client_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub sequence_num: u32,
+    pub events: Vec<MarketTradeEvent>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MarketTradeEvent {
     #[serde(rename = "type")]
-    event_type: String,
+    pub event_type: String,
     pub trades: Vec<Trade>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Trade {
     pub trade_id: String,
     pub product_id: String,
@@ -48,34 +86,6 @@ pub struct Trade {
     pub size: f64,
     pub side: TradeSide,
     pub time: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum TradeSide {
-    BUY,
-    SELL,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TradeMessage {
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub trades: Vec<Trade>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HeartbeatMessage {
-    current_time: DateTime<Utc>,
-    heartbeat_counter: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum EventType {
-    #[serde(rename = "trade_event")]
-    TradeEvent(MarketTrade),
-    #[serde(rename = "heartbeat")]
-    Heartbeat(Heartbeat),
 }
 
 #[derive(Debug)]
@@ -146,6 +156,34 @@ pub(crate) mod string_or_float {
                 }
             }
             StringOrFloat::Float(i) => Ok(i),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Event {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let v: serde_json::Value = serde_json::Value::deserialize(deserializer)?;
+
+        match v.get("channel").and_then(|c| c.as_str()) {
+            Some("subscriptions") => {
+                let message =
+                    serde_json::from_value::<SubscriptionMessage>(v).map_err(DeError::custom)?;
+                Ok(Event::Subscriptions(message))
+            }
+            Some("heartbeats") => {
+                let message =
+                    serde_json::from_value::<HeartbeatMessage>(v).map_err(DeError::custom)?;
+                Ok(Event::Heartbeats(message))
+            }
+            Some("market_trades") => {
+                let message =
+                    serde_json::from_value::<MarketTradesMessage>(v).map_err(DeError::custom)?;
+                Ok(Event::MarketTrades(message))
+            }
+            _ => Err(DeError::custom("Unknown channel")),
         }
     }
 }

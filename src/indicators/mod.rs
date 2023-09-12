@@ -17,104 +17,77 @@ pub mod ema;
 pub mod macd;
 pub mod rsi;
 
-pub enum IndicatorType {
-    Candlestick(OneMinuteCandle),
-    Shutdown(bool),
+pub enum Signal {
+    Buy,
+    Sell,
+    Hold,
 }
 
+pub enum IndicatorType {
+    Candlestick(OneMinuteCandle),
+}
+
+#[derive(Debug)]
 pub struct BotIndicator {
     short_ema: Ema,
     long_ema: Ema,
+    macd_short_ema: Ema,
     macd: Macd,
+    pub rsi: Rsi,
+    pub adx: Adx,
 }
 
 impl BotIndicator {
     pub fn new() -> Self {
-        let short_ema = Ema::new(12);
+        let short_ema = Ema::new(9);
+        let macd_short_ema = Ema::new(12);
         let long_ema = Ema::new(26);
         let macd = Macd::new(9);
+        let rsi = Rsi::new(14);
+        let adx = Adx::new(14);
 
         BotIndicator {
             short_ema,
             long_ema,
+            macd_short_ema,
             macd,
+            rsi,
+            adx,
         }
     }
 
-    fn process_calculation(
-        rx: Receiver<IndicatorType>,
-        short_ema: Arc<Mutex<Ema>>,
-        long_ema: Arc<Mutex<Ema>>,
-        macd: Arc<Mutex<Macd>>,
-        rsi: Arc<Mutex<Rsi>>,
-        adx: Arc<Mutex<Adx>>,
-    ) {
-        while let Ok(indactor_type) = rx.recv() {
-            match indactor_type {
-                IndicatorType::Candlestick(candle) => {
-                    // {
-                    //     let mut local_short_ema = short_ema.lock().unwrap();
-                    //     local_short_ema.update(candle.close.unwrap());
-                    //     println!("{:?}", local_short_ema.get_current_ema());
-                    // }
-                    // {
-                    //     let mut local_long_ema = long_ema.lock().unwrap();
-                    //     local_long_ema.update(candle.close.unwrap());
-                    //     println!("{:?}", local_long_ema.get_current_ema());
-                    // }
-                    // {
-                    //     let mut local_macd = macd.lock().unwrap();
-                    //     local_macd.update(candle.close.unwrap());
-                    //     println!("{:?}", local_macd.get_signal_n_macd());
-                    // }
-                    // {
-                    //     let mut local_rsi = rsi.lock().unwrap();
-                    //     local_rsi.update(candle.close.unwrap());
-                    //     println!("{:?}", local_rsi.get_rsi());
-                    // }
-                    // {
-                    //     let mut local_adx = adx.lock().unwrap();
-                    //     local_adx.update(
-                    //         candle.high.unwrap(),
-                    //         candle.low.unwrap(),
-                    //         candle.close.unwrap(),
-                    //     );
-                    //     println!("{:?}", local_adx.get_adx());
-                    // }
+    pub fn process_data(&mut self, data: IndicatorType) {
+        match data {
+            IndicatorType::Candlestick(candle_stick) => {
+                self.short_ema.update(candle_stick.close);
+                self.macd_short_ema.update(candle_stick.close);
+                self.long_ema.update(candle_stick.close);
+
+                if let (Some(short_ema), Some(long_ema)) =
+                    (self.macd_short_ema.get_ema(), self.long_ema.get_ema())
+                {
+                    self.macd.update(short_ema, long_ema);
                 }
-                IndicatorType::Shutdown(shutdown) => {
-                    if shutdown {
-                        break;
-                    }
-                }
+
+                self.rsi.update(candle_stick.close);
+
+                self.adx
+                    .update(candle_stick.high, candle_stick.low, candle_stick.close);
             }
         }
     }
 
-    pub fn send_to_processing(&self, data: IndicatorType) {
-        // self.tx.send(data).expect("Failed to send to channel");
+    pub fn get_short_ema(&self) -> Option<f64> {
+        self.short_ema.get_ema()
     }
 
-    pub fn check_signal(&self) {
-        // let short_ema = self.short_ema.lock().unwrap().get_current_ema();
-        // let long_ema = self.long_ema.lock().unwrap().get_current_ema();
-
-        // let macd_values = self.macd.lock().unwrap().get_signal_n_macd();
-        // let rsi = self.rsi.lock().unwrap().get_rsi();
-
-        // if let (
-        //     Some(short_ema_value),
-        //     Some(long_ema_value),
-        //     Some(macd_signal),
-        //     Some(macd_v),
-        //     rsi_value,
-        // ) = (short_ema, long_ema, macd_values.0, macd_values.1, rsi)
-        // {
-        //     if short_ema_value > long_ema_value && macd_signal < macd_v && rsi_value < dec!(30.0) {
-        //         println!("BUY");
-        //     } else {
-        //         println!("SELL");
-        //     }
-        // }
+    pub fn get_long_ema(&self) -> Option<f64> {
+        self.long_ema.get_ema()
     }
+
+    pub fn get_macd_histogram(&self) -> Option<f64> {
+        self.macd.get_histogram()
+    }
+
+    // pub fn check(&self) -> Signal {}
 }

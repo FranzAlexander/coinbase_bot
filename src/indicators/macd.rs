@@ -1,5 +1,6 @@
 use super::ema::Ema;
 
+#[derive(Debug)]
 pub struct Macd {
     signal: Ema,
     prev_macd: Option<f64>,
