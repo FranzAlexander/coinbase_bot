@@ -1,18 +1,9 @@
-use std::{
-    sync::{
-        mpsc::{self, Receiver},
-        Arc, Mutex,
-    },
-    thread,
-};
-
-use rust_decimal_macros::dec;
-
 use crate::model::OneMinuteCandle;
 
-use self::{adx::Adx, ema::Ema, macd::Macd, rsi::Rsi};
+use self::{adx::Adx, bollinger_bands::BollingerBands, ema::Ema, macd::Macd, rsi::Rsi};
 
 mod adx;
+mod bollinger_bands;
 pub mod ema;
 pub mod macd;
 pub mod rsi;
@@ -35,6 +26,7 @@ pub struct BotIndicator {
     macd: Macd,
     pub rsi: Rsi,
     pub adx: Adx,
+    pub b_bands: BollingerBands,
 }
 
 impl BotIndicator {
@@ -44,7 +36,8 @@ impl BotIndicator {
         let long_ema = Ema::new(26);
         let macd = Macd::new(9);
         let rsi = Rsi::new(14);
-        let adx = Adx::new(14);
+        let adx = Adx::new(14, 14);
+        let b_bands = BollingerBands::new(20);
 
         BotIndicator {
             short_ema,
@@ -53,6 +46,7 @@ impl BotIndicator {
             macd,
             rsi,
             adx,
+            b_bands,
         }
     }
 
@@ -73,12 +67,18 @@ impl BotIndicator {
 
                 self.adx
                     .update(candle_stick.high, candle_stick.low, candle_stick.close);
+
+                self.b_bands.update(candle_stick.close);
             }
         }
     }
 
     pub fn get_short_ema(&self) -> Option<f64> {
         self.short_ema.get_ema()
+    }
+
+    pub fn get_short_macd_ema(&self) -> Option<f64> {
+        self.macd_short_ema.get_ema()
     }
 
     pub fn get_long_ema(&self) -> Option<f64> {

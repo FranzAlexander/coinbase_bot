@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{de::Error as DeError, Deserialize};
+use serde::{de::Error as DeError, Deserialize, Serialize};
 
 // Common fields for all the messages
 #[derive(Debug, Deserialize)]
@@ -51,9 +51,10 @@ pub enum Event {
     Subscriptions(SubscriptionMessage),
     Heartbeats(HeartbeatMessage),
     MarketTrades(MarketTradesMessage),
+    Candles(CandlestickMessage),
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TradeSide {
     Buy,
@@ -69,6 +70,15 @@ pub struct MarketTradesMessage {
     pub events: Vec<MarketTradeEvent>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CandlestickMessage {
+    channel: String,
+    client_id: String,
+    timestamp: String, // or use chrono::NaiveDateTime if you're using the `chrono` crate
+    sequence_num: u64,
+    events: Vec<CandlestickEvent>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct MarketTradeEvent {
     #[serde(rename = "type")]
@@ -76,7 +86,7 @@ pub struct MarketTradeEvent {
     pub trades: Vec<Trade>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Trade {
     pub trade_id: String,
     pub product_id: String,
@@ -86,6 +96,29 @@ pub struct Trade {
     pub size: f64,
     pub side: TradeSide,
     pub time: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CandlestickEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub candles: Vec<Candlestick>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Candlestick {
+    pub start: String,
+    #[serde(with = "string_or_float")]
+    pub high: f64,
+    #[serde(with = "string_or_float")]
+    pub low: f64,
+    #[serde(with = "string_or_float")]
+    pub open: f64,
+    #[serde(with = "string_or_float")]
+    pub close: f64,
+    #[serde(with = "string_or_float")]
+    pub volume: f64,
+    pub product_id: String,
 }
 
 #[derive(Debug)]
@@ -182,6 +215,11 @@ impl<'de> Deserialize<'de> for Event {
                 let message =
                     serde_json::from_value::<MarketTradesMessage>(v).map_err(DeError::custom)?;
                 Ok(Event::MarketTrades(message))
+            }
+            Some("candles") => {
+                let message =
+                    serde_json::from_value::<CandlestickMessage>(v).map_err(DeError::custom)?;
+                Ok(Event::Candles(message))
             }
             _ => Err(DeError::custom("Unknown channel")),
         }

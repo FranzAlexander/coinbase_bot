@@ -1,0 +1,802 @@
+[
+  {
+    "trade_id": "30043665",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "512.611182",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:18.152128Z"
+  },
+  {
+    "trade_id": "30043664",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "616.009446",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:14.477052Z"
+  },
+  {
+    "trade_id": "30043663",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "107.013426",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:14.477052Z"
+  },
+  {
+    "trade_id": "30043662",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "0.151117",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:10.779202Z"
+  },
+  {
+    "trade_id": "30043661",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "42.212789",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:10.779202Z"
+  },
+  {
+    "trade_id": "30043660",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "64.800637",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:10.533333Z"
+  },
+  {
+    "trade_id": "30043659",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "60.273344",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:08.338306Z"
+  },
+  {
+    "trade_id": "30043658",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "4.527293",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:08.338306Z"
+  },
+  {
+    "trade_id": "30043657",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:06.221255Z"
+  },
+  {
+    "trade_id": "30043656",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:06.221255Z"
+  },
+  {
+    "trade_id": "30043655",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "0.000012",
+    "side": "BUY",
+    "time": "2023-09-12T02:45:06.221255Z"
+  },
+  {
+    "trade_id": "30043654",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "234.787",
+    "side": "SELL",
+    "time": "2023-09-12T02:45:00.561020Z"
+  },
+  {
+    "trade_id": "30043653",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "0.803015",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:47.051665Z"
+  },
+  {
+    "trade_id": "30043652",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "256.302978",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:45.404067Z"
+  },
+  {
+    "trade_id": "30043651",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "147.279092",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:45.404067Z"
+  },
+  {
+    "trade_id": "30043650",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "9.054587",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:45.404067Z"
+  },
+  {
+    "trade_id": "30043649",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "74.498847",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:41.955550Z"
+  },
+  {
+    "trade_id": "30043648",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "21181.68211",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043647",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043646",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "200",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043645",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "400",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043644",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "2158",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043643",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "500",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043642",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "3316.565402",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043641",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "1611.476837",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043640",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "3207.874531",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043639",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "4030",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043638",
+    "product_id": "XRP-USD",
+    "price": "0.4721",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.092319Z"
+  },
+  {
+    "trade_id": "30043637",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.078065Z"
+  },
+  {
+    "trade_id": "30043636",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "141.985107",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.078065Z"
+  },
+  {
+    "trade_id": "30043635",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:41.078065Z"
+  },
+  {
+    "trade_id": "30043634",
+    "product_id": "XRP-USD",
+    "price": "0.4722",
+    "size": "36.012857",
+    "side": "BUY",
+    "time": "2023-09-12T02:44:25.666196Z"
+  },
+  {
+    "trade_id": "30043633",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "200.17997",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:17.931928Z"
+  },
+  {
+    "trade_id": "30043632",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "307.955777",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:12.077280Z"
+  },
+  {
+    "trade_id": "30043631",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "104.761905",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:11.595655Z"
+  },
+  {
+    "trade_id": "30043630",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "400.849776",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:04.732298Z"
+  },
+  {
+    "trade_id": "30043629",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "18.109174",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:04.732298Z"
+  },
+  {
+    "trade_id": "30043628",
+    "product_id": "XRP-USD",
+    "price": "0.4724",
+    "size": "130.973333",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:00.124825Z"
+  },
+  {
+    "trade_id": "30043627",
+    "product_id": "XRP-USD",
+    "price": "0.4724",
+    "size": "64.860684",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:00.066335Z"
+  },
+  {
+    "trade_id": "30043626",
+    "product_id": "XRP-USD",
+    "price": "0.4724",
+    "size": "36.218347",
+    "side": "SELL",
+    "time": "2023-09-12T02:44:00.066335Z"
+  },
+  {
+    "trade_id": "30043625",
+    "product_id": "XRP-USD",
+    "price": "0.4723",
+    "size": "1269.57428",
+    "side": "BUY",
+    "time": "2023-09-12T02:43:57.369380Z"
+  },
+  {
+    "trade_id": "30043624",
+    "product_id": "XRP-USD",
+    "price": "0.4726",
+    "size": "3.002781",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:44.833592Z"
+  },
+  {
+    "trade_id": "30043623",
+    "product_id": "XRP-USD",
+    "price": "0.4726",
+    "size": "5.293985",
+    "side": "BUY",
+    "time": "2023-09-12T02:43:32.221716Z"
+  },
+  {
+    "trade_id": "30043622",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "1627.864789",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:30.062964Z"
+  },
+  {
+    "trade_id": "30043621",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "848.454653",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:30.062964Z"
+  },
+  {
+    "trade_id": "30043620",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "24.730086",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:29.461359Z"
+  },
+  {
+    "trade_id": "30043619",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "105.550599",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:29.461359Z"
+  },
+  {
+    "trade_id": "30043618",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "10.64527",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:20.142121Z"
+  },
+  {
+    "trade_id": "30043617",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "210.492913",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:14.031218Z"
+  },
+  {
+    "trade_id": "30043616",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "412.433707",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:08.618701Z"
+  },
+  {
+    "trade_id": "30043615",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "104.71758",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:05.994524Z"
+  },
+  {
+    "trade_id": "30043614",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "8.438981",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:04.367405Z"
+  },
+  {
+    "trade_id": "30043613",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "412.520939",
+    "side": "SELL",
+    "time": "2023-09-12T02:43:03.182327Z"
+  },
+  {
+    "trade_id": "30043612",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "159.500674",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:58.873462Z"
+  },
+  {
+    "trade_id": "30043611",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "116.195868",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:58.873462Z"
+  },
+  {
+    "trade_id": "30043610",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "32.194086",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:58.873462Z"
+  },
+  {
+    "trade_id": "30043609",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "2324.999991",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:56.232215Z"
+  },
+  {
+    "trade_id": "30043608",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "2310.595489",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:56.232215Z"
+  },
+  {
+    "trade_id": "30043607",
+    "product_id": "XRP-USD",
+    "price": "0.4727",
+    "size": "14.404511",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:54.193946Z"
+  },
+  {
+    "trade_id": "30043606",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "0.00001",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:45.760610Z"
+  },
+  {
+    "trade_id": "30043605",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "0.168044",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:41.104138Z"
+  },
+  {
+    "trade_id": "30043604",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "291.6666",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:41.067208Z"
+  },
+  {
+    "trade_id": "30043603",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "128.776345",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:41.067208Z"
+  },
+  {
+    "trade_id": "30043602",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "131.959072",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:39.157861Z"
+  },
+  {
+    "trade_id": "30043601",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "63.445618",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:39.157861Z"
+  },
+  {
+    "trade_id": "30043600",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "2325",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:39.078495Z"
+  },
+  {
+    "trade_id": "30043599",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "100.432655",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:39.078495Z"
+  },
+  {
+    "trade_id": "30043598",
+    "product_id": "XRP-USD",
+    "price": "0.473",
+    "size": "6979.184239",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:37.350233Z"
+  },
+  {
+    "trade_id": "30043597",
+    "product_id": "XRP-USD",
+    "price": "0.473",
+    "size": "5386.004192",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:37.350233Z"
+  },
+  {
+    "trade_id": "30043596",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "2158",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:37.350233Z"
+  },
+  {
+    "trade_id": "30043595",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "66.988892",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:37.350233Z"
+  },
+  {
+    "trade_id": "30043594",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "421.97263",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:37.293638Z"
+  },
+  {
+    "trade_id": "30043593",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "49.206977",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:24.594959Z"
+  },
+  {
+    "trade_id": "30043592",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "1162.815263",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:24.171985Z"
+  },
+  {
+    "trade_id": "30043591",
+    "product_id": "XRP-USD",
+    "price": "0.473",
+    "size": "20.925808",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:07.534519Z"
+  },
+  {
+    "trade_id": "30043590",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "1655.318248",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043589",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "4030",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043588",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "2158",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043587",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "1057.567628",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043586",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "500",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043585",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "400",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043584",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "200",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043583",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "116.195868",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.553827Z"
+  },
+  {
+    "trade_id": "30043582",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "365.008575",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:06.406529Z"
+  },
+  {
+    "trade_id": "30043581",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "68.161338",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:02.923477Z"
+  },
+  {
+    "trade_id": "30043580",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "0.000009",
+    "side": "BUY",
+    "time": "2023-09-12T02:42:02.923477Z"
+  },
+  {
+    "trade_id": "30043579",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "91.678066",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:00.989721Z"
+  },
+  {
+    "trade_id": "30043578",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "23.413881",
+    "side": "SELL",
+    "time": "2023-09-12T02:42:00.989721Z"
+  },
+  {
+    "trade_id": "30043577",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "4394.036302",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:59.213709Z"
+  },
+  {
+    "trade_id": "30043576",
+    "product_id": "XRP-USD",
+    "price": "0.4728",
+    "size": "63.445618",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:59.213709Z"
+  },
+  {
+    "trade_id": "30043575",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "234.3558",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:55.430200Z"
+  },
+  {
+    "trade_id": "30043574",
+    "product_id": "XRP-USD",
+    "price": "0.4729",
+    "size": "525.595976",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:52.265607Z"
+  },
+  {
+    "trade_id": "30043573",
+    "product_id": "XRP-USD",
+    "price": "0.473",
+    "size": "52.136671",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:52.265607Z"
+  },
+  {
+    "trade_id": "30043572",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "41.217574",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:44.709733Z"
+  },
+  {
+    "trade_id": "30043571",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "300.724794",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:32.612316Z"
+  },
+  {
+    "trade_id": "30043570",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "2.092581",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:27.097667Z"
+  },
+  {
+    "trade_id": "30043569",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "209.258085",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:09.045585Z"
+  },
+  {
+    "trade_id": "30043568",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "164.793406",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:04.586502Z"
+  },
+  {
+    "trade_id": "30043567",
+    "product_id": "XRP-USD",
+    "price": "0.4731",
+    "size": "100.464807",
+    "side": "SELL",
+    "time": "2023-09-12T02:41:04.114859Z"
+  },
+  {
+    "trade_id": "30043566",
+    "product_id": "XRP-USD",
+    "price": "0.473",
+    "size": "64.059197",
+    "side": "BUY",
+    "time": "2023-09-12T02:41:04.050849Z"
+  }
+]

@@ -41,7 +41,7 @@ async fn main() {
     let (mut ws_stream, _) = connect_async(url).await.unwrap();
 
     // Channels to subscribe to
-    let channels = vec!["heartbeats", "market_trades"];
+    let channels = vec!["heartbeats", "market_trades", "candles"];
     for channel in channels.iter() {
         subscribe(&mut ws_stream, "XRP-USD", channel, "subscribe").await;
     }
@@ -71,6 +71,8 @@ async fn main() {
         process_l2_data_stream(l2_data_receiver).await;
     });
 
+    let mut check_time = Instant::now();
+
     while let Some(msg) = ws_stream.next().await {
         if is_terminating.load(Ordering::Relaxed) {
             info!("Received shutdown signal. Gracefully terminating...");
@@ -82,6 +84,7 @@ async fn main() {
         }
 
         if let Ok(Message::Text(text)) = msg {
+            // println!("{}", text);
             let event: Event = serde_json::from_str(&text).unwrap();
 
             match event {
@@ -94,27 +97,47 @@ async fn main() {
                 Event::MarketTrades(trades) => {
                     let _ = market_trades_sender.send(trades.events[0].clone()).await;
                 }
+                Event::Candles(candles) => {
+                    event!(Level::INFO, "{:?}", candles)
+                }
             }
         }
-        {
-            let bot_locked = bot_indicator.lock().unwrap();
-            if let Some(short_ema) = bot_locked.get_short_ema() {
-                info!("Short ema: {}", short_ema);
-            }
-            if let Some(long_ema) = bot_locked.get_long_ema() {
-                info!("Long ema: {}", long_ema);
-            }
+        // if check_time.elapsed().as_secs() >= 5 {
+        //     {
+        //         let bot_locked = bot_indicator.lock().unwrap();
+        //         if let Some(short_ema) = bot_locked.get_short_ema() {
+        //             info!("Short ema: {}", short_ema);
+        //         }
 
-            if let Some(hista) = bot_locked.get_macd_histogram() {
-                info!("Histagram: {}", hista);
-            }
-            if let Some(rsi) = bot_locked.rsi.get_rsi() {
-                info!("RSI: {}", rsi);
-            }
-            if let Some(adx) = bot_locked.adx.get_adx() {
-                info!("ADX: {}", adx);
-            }
-        }
+        //         if let Some(macd_short_ema) = bot_locked.get_short_macd_ema() {
+        //             info!("Short MACD ema: {}", macd_short_ema)
+        //         }
+
+        //         if let Some(long_ema) = bot_locked.get_long_ema() {
+        //             info!("Long ema: {}", long_ema);
+        //         }
+
+        //         if let Some(hista) = bot_locked.get_macd_histogram() {
+        //             info!("Histagram: {}", hista);
+        //         }
+        //         if let Some(rsi) = bot_locked.rsi.get_rsi() {
+        //             info!("RSI: {}", rsi);
+        //         }
+        //         if let Some(adx) = bot_locked.adx.get_adx() {
+        //             info!("ADX: {}", adx);
+        //         }
+        //         if let (Some(upper_band), Some(middle_band), Some(lower_band)) =
+        //             bot_locked.b_bands.get_bands()
+        //         {
+        //             info!(
+        //                 "Upper Band: {}, Middle Band: {}, Lower Band: {}",
+        //                 upper_band, middle_band, lower_band
+        //             )
+        //         }
+        //     }
+
+        //     check_time = Instant::now();
+        // }
     }
 }
 
