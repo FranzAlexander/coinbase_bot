@@ -6,33 +6,37 @@ use std::{
     },
 };
 
+use account::Account;
 use dotenv::dotenv;
 use futures::{SinkExt, StreamExt};
-use hmac::{Hmac, Mac};
-use indicators::BotIndicator;
 use model::{MarketTradeEvent, OneMinuteCandle};
 use serde_json::{json, Value};
-use sha2::Sha256;
 
 use tokio::{net::TcpStream, signal, sync::mpsc, time::Instant};
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{event, info, instrument, Level};
+use trading_bot::TradingBot;
+use util::subscribe;
 
-use crate::model::{Event, Trade};
-
-type HmacSha256 = Hmac<Sha256>;
+use crate::{
+    model::{Event, Trade},
+    trading_bot::IndicatorType,
+};
 
 mod account;
 mod indicators;
 mod model;
+mod trading_bot;
+mod util;
 
 #[tokio::main]
 async fn main() {
     // install global collector configured based on RUST_LOG env var.
     tracing_subscriber::fmt::init();
 
-    // Load environment variables from .env file
-    dotenv().ok();
+    let mut account = Account::new();
+    account.get_wallet().await;
+    account.update_balances().await;
 
     // WebSocket URL for Coinbase Pro
     let url = url::Url::parse("wss://advanced-trade-ws.coinbase.com").unwrap();
@@ -41,14 +45,17 @@ async fn main() {
     let (mut ws_stream, _) = connect_async(url).await.unwrap();
 
     // Channels to subscribe to
-    let channels = vec!["heartbeats", "market_trades", "candles"];
+    let channels = vec!["heartbeats", "candles"];
     for channel in channels.iter() {
         subscribe(&mut ws_stream, "XRP-USD", channel, "subscribe").await;
     }
 
-    let bot_indicator = Arc::new(Mutex::new(BotIndicator::new()));
-    let bot_clone = bot_indicator.clone();
-    // Shared state to check for shutdown
+    let trading_bot = Arc::new(Mutex::new(TradingBot::new()));
+
+    // let bot_indicator = Arc::new(Mutex::new(BotIndicator::new()));
+    // let bot_clone = bot_indicator.clone();
+
+    // // Shared state to check for shutdown
     let is_terminating = Arc::new(AtomicBool::new(false));
 
     // Start listening for shutdown signals in the background
@@ -58,20 +65,18 @@ async fn main() {
         termination_flag.store(true, Ordering::Relaxed);
     });
 
-    // Create channels for market trade and level2 data
-    let (market_trades_sender, market_trades_receiver) = mpsc::channel::<MarketTradeEvent>(100);
-    let (l2_data_sender, l2_data_receiver) = mpsc::channel::<Value>(100);
+    // // Create channels for market trade and level2 data
+    // let (market_trades_sender, market_trades_receiver) = mpsc::channel::<MarketTradeEvent>(100);
+    // let (l2_data_sender, l2_data_receiver) = mpsc::channel::<Value>(100);
 
-    // Spawn tasks to process data from the channels
-    tokio::spawn(async move {
-        process_market_trades_stream(market_trades_receiver, bot_clone).await;
-    });
+    // // Spawn tasks to process data from the channels
+    // tokio::spawn(async move {
+    //     process_market_trades_stream(market_trades_receiver, bot_clone).await;
+    // });
 
-    tokio::spawn(async move {
-        process_l2_data_stream(l2_data_receiver).await;
-    });
-
-    let mut check_time = Instant::now();
+    // tokio::spawn(async move {
+    //     process_l2_data_stream(l2_data_receiver).await;
+    // });
 
     while let Some(msg) = ws_stream.next().await {
         if is_terminating.load(Ordering::Relaxed) {
@@ -84,7 +89,7 @@ async fn main() {
         }
 
         if let Ok(Message::Text(text)) = msg {
-            // println!("{}", text);
+            println!("{}", text);
             let event: Event = serde_json::from_str(&text).unwrap();
 
             match event {
@@ -94,56 +99,31 @@ async fn main() {
                 Event::Heartbeats(_) => {
                     event!(Level::INFO, "Heartbeat");
                 }
-                Event::MarketTrades(trades) => {
-                    let _ = market_trades_sender.send(trades.events[0].clone()).await;
-                }
                 Event::Candles(candles) => {
-                    event!(Level::INFO, "{:?}", candles)
+                    if candles.events[0].event_type == "update" {
+                        let mut locked_bot = trading_bot.lock().unwrap();
+                        locked_bot.process_data(IndicatorType::Candlestick(
+                            candles.events[0].candles[0].clone(),
+                        ))
+                    }
                 }
             }
         }
-        // if check_time.elapsed().as_secs() >= 5 {
-        //     {
-        //         let bot_locked = bot_indicator.lock().unwrap();
-        //         if let Some(short_ema) = bot_locked.get_short_ema() {
-        //             info!("Short ema: {}", short_ema);
-        //         }
 
-        //         if let Some(macd_short_ema) = bot_locked.get_short_macd_ema() {
-        //             info!("Short MACD ema: {}", macd_short_ema)
-        //         }
-
-        //         if let Some(long_ema) = bot_locked.get_long_ema() {
-        //             info!("Long ema: {}", long_ema);
-        //         }
-
-        //         if let Some(hista) = bot_locked.get_macd_histogram() {
-        //             info!("Histagram: {}", hista);
-        //         }
-        //         if let Some(rsi) = bot_locked.rsi.get_rsi() {
-        //             info!("RSI: {}", rsi);
-        //         }
-        //         if let Some(adx) = bot_locked.adx.get_adx() {
-        //             info!("ADX: {}", adx);
-        //         }
-        //         if let (Some(upper_band), Some(middle_band), Some(lower_band)) =
-        //             bot_locked.b_bands.get_bands()
-        //         {
-        //             info!(
-        //                 "Upper Band: {}, Middle Band: {}, Lower Band: {}",
-        //                 upper_band, middle_band, lower_band
-        //             )
-        //         }
-        //     }
-
-        //     check_time = Instant::now();
-        // }
+        {
+            let mut locked_bot = trading_bot.lock().unwrap();
+            if locked_bot.can_trade {
+                let signal = locked_bot.check_trade_signal();
+                info!("{}", signal);
+                locked_bot.can_trade = false;
+            }
+        }
     }
 }
 
 async fn process_market_trades_stream(
     mut receiver: mpsc::Receiver<MarketTradeEvent>,
-    bot: Arc<Mutex<BotIndicator>>,
+    bot: Arc<Mutex<TradingBot>>,
 ) {
     let mut trade_buffer: Vec<Trade> = Vec::new();
     let mut start_time = Instant::now();
@@ -165,7 +145,7 @@ async fn process_market_trades_stream(
             let bot_clone = bot.clone();
             tokio::task::spawn_blocking(move || {
                 let mut bot_locked = bot_clone.lock().unwrap();
-                bot_locked.process_data(indicators::IndicatorType::Candlestick(candle));
+                // bot_locked.process_data(indicators::IndicatorType::Candlestick(candle));
             })
             .await
             .expect("Failed to process in blocking thread");
@@ -178,39 +158,4 @@ async fn process_market_trades_stream(
 
 async fn process_l2_data_stream(mut receiver: mpsc::Receiver<Value>) {
     while let Some(_data) = receiver.recv().await {}
-}
-async fn subscribe(
-    ws_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
-    market: &str,
-    channel: &str,
-    event: &str,
-) {
-    let timestamp = format!("{}", chrono::Utc::now().timestamp());
-    let msg_to_sign = format!("{}{}{}", timestamp, channel, market);
-    let signature = sign_message(&msg_to_sign);
-    let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
-
-    let subscribe_msg = json!({
-        "type": event.to_string(),
-        "product_ids": [market],
-        "channel": channel,
-        "api_key": api_key,
-        "timestamp": timestamp,
-        "signature": signature
-    });
-
-    ws_stream
-        .send(Message::Text(subscribe_msg.to_string()))
-        .await
-        .unwrap();
-}
-
-fn sign_message(message: &str) -> String {
-    let api_secret = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
-
-    let mut mac =
-        HmacSha256::new_from_slice(api_secret.as_bytes()).expect("HMAC can take key of any size");
-
-    mac.update(message.as_bytes());
-    format!("{:x}", mac.finalize().into_bytes())
 }

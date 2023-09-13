@@ -50,7 +50,6 @@ pub struct SubscriptionEvent {
 pub enum Event {
     Subscriptions(SubscriptionMessage),
     Heartbeats(HeartbeatMessage),
-    MarketTrades(MarketTradesMessage),
     Candles(CandlestickMessage),
 }
 
@@ -76,7 +75,7 @@ pub struct CandlestickMessage {
     client_id: String,
     timestamp: String, // or use chrono::NaiveDateTime if you're using the `chrono` crate
     sequence_num: u64,
-    events: Vec<CandlestickEvent>,
+    pub events: Vec<CandlestickEvent>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -105,9 +104,10 @@ pub struct CandlestickEvent {
     pub candles: Vec<Candlestick>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Candlestick {
-    pub start: String,
+    #[serde(with = "string_or_i64")]
+    pub start: i64,
     #[serde(with = "string_or_float")]
     pub high: f64,
     #[serde(with = "string_or_float")]
@@ -193,6 +193,36 @@ pub(crate) mod string_or_float {
     }
 }
 
+pub(crate) mod string_or_i64 {
+    use serde::{de, Deserialize, Deserializer, Serializer};
+    use std::fmt;
+
+    pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: fmt::Display,
+        S: Serializer,
+    {
+        serializer.collect_str(value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum StringOrI64 {
+            String(String),
+            Int(i64),
+        }
+
+        match StringOrI64::deserialize(deserializer)? {
+            StringOrI64::String(s) => s.parse().map_err(de::Error::custom),
+            StringOrI64::Int(i) => Ok(i),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for Event {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -211,11 +241,6 @@ impl<'de> Deserialize<'de> for Event {
                     serde_json::from_value::<HeartbeatMessage>(v).map_err(DeError::custom)?;
                 Ok(Event::Heartbeats(message))
             }
-            Some("market_trades") => {
-                let message =
-                    serde_json::from_value::<MarketTradesMessage>(v).map_err(DeError::custom)?;
-                Ok(Event::MarketTrades(message))
-            }
             Some("candles") => {
                 let message =
                     serde_json::from_value::<CandlestickMessage>(v).map_err(DeError::custom)?;
@@ -224,4 +249,45 @@ impl<'de> Deserialize<'de> for Event {
             _ => Err(DeError::custom("Unknown channel")),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountList {
+    pub accounts: Vec<Account>,
+    pub has_next: bool,
+    pub cursor: Option<String>,
+    pub size: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Account {
+    pub uuid: String,
+    pub name: String,
+    pub currency: String,
+    pub available_balance: Balance,
+    pub default: bool,
+    pub active: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    pub deleted_at: Option<String>,
+    #[serde(rename = "type")] // "type" is a keyword in Rust, so we rename it
+    pub account_type: AccountType,
+    pub ready: bool,
+    pub hold: Balance,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Balance {
+    #[serde(with = "string_or_float")]
+    pub value: f64,
+    pub currency: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AccountType {
+    AccountTypeUnspecified,
+    AccountTypeCrypto,
+    AccountTypeFiat,
+    AccountTypeVault,
 }

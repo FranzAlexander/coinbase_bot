@@ -3,9 +3,9 @@ pub struct BollingerBands {
     period: usize,
     sma: Vec<f64>,
     prices: Vec<f64>,
-    upper_band: Option<f64>,
+    pub upper_band: Option<f64>,
     middle_band: Option<f64>,
-    lower_band: Option<f64>,
+    pub lower_band: Option<f64>,
 }
 
 impl BollingerBands {
