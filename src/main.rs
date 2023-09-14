@@ -34,10 +34,12 @@ async fn main() {
     // install global collector configured based on RUST_LOG env var.
     tracing_subscriber::fmt::init();
 
-    let mut account = Account::new();
-    account.get_wallet().await;
-    account.update_balances().await;
-
+    let account = Arc::new(Mutex::new(Account::new()));
+    {
+        let mut locked_acc = account.lock().unwrap();
+        locked_acc.get_wallet().await;
+        locked_acc.update_balances().await;
+    }
     // WebSocket URL for Coinbase Pro
     let url = url::Url::parse("wss://advanced-trade-ws.coinbase.com").unwrap();
 
@@ -88,6 +90,7 @@ async fn main() {
         }
 
         if let Ok(Message::Text(text)) = msg {
+            // info!("MSG: {}", text);
             let event: Event = serde_json::from_str(&text).unwrap();
 
             match event {
@@ -95,7 +98,7 @@ async fn main() {
                     event!(Level::INFO, "Subscription");
                 }
                 Event::Heartbeats(_) => {
-                    event!(Level::INFO, "Heartbeat");
+                    // event!(Level::INFO, "Heartbeat");
                 }
                 Event::Candles(candles) => {
                     let _ = candle_sender.send(candles.events).await;
@@ -108,16 +111,21 @@ async fn main() {
 
         {
             let mut locked_bot = trading_bot.lock().unwrap();
+            let locked_acc = account.lock().unwrap();
+
             if locked_bot.can_trade {
                 let signal = locked_bot.check_trade_signal();
                 match signal {
                     trading_bot::TradeSignal::Buy => {
-                        if locked_bot.can_trade && account.can_buy() {
+                        info!("BUYING");
+                        if locked_bot.can_trade && locked_acc.can_buy() {
                             info!("Buy: {}", locked_bot.current_price);
                         }
                     }
                     trading_bot::TradeSignal::Sell => {
-                        if locked_bot.can_trade && account.can_sell() {
+                        info!("SELLING");
+
+                        if locked_bot.can_trade && locked_acc.can_sell() {
                             info!("Sell: {}", locked_bot.current_price);
                         }
                     }
@@ -127,6 +135,8 @@ async fn main() {
             }
         }
     }
+
+    println!("ALL DONE");
 }
 
 async fn process_candle_stick_stream(

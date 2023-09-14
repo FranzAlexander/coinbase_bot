@@ -7,6 +7,7 @@ use crate::{
     model::{Candlestick, L2Data, Level2Event},
 };
 
+#[derive(Debug)]
 pub enum TradeSignal {
     Buy,
     Sell,
@@ -28,6 +29,7 @@ pub enum IndicatorType {
     L2Data(Level2Event),
 }
 
+#[derive(Debug)]
 pub struct TradingBot {
     pub current_price: f64,
     current_candle_time: i64,
