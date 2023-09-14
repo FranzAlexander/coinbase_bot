@@ -16,8 +16,8 @@ const API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 #[derive(Debug)]
 pub struct Account {
     client: reqwest::Client,
-    asset: Option<Balance>,
-    currency: Option<Balance>,
+    pub asset: Option<Balance>,
+    pub currency: Option<Balance>,
     api_key: String,
     secret_key: String,
 }
@@ -84,6 +84,22 @@ impl Account {
 
         let account: AccountList = serde_json::from_value(response).unwrap();
         account
+    }
+
+    pub fn can_buy(&self) -> bool {
+        if let Some(currency) = &self.currency {
+            currency.value > 1.0
+        } else {
+            false
+        }
+    }
+
+    pub fn can_sell(&self) -> bool {
+        if let Some(asset) = &self.asset {
+            asset.value > 1.0
+        } else {
+            false
+        }
     }
 
     fn sign(&self, timestamp: &str, method: &str, request_path: &str, body: &str) -> String {

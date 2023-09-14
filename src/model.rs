@@ -1,14 +1,7 @@
+use std::clone;
+
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{de::Error as DeError, Deserialize, Serialize};
-
-// Common fields for all the messages
-#[derive(Debug, Deserialize)]
-pub struct CommonFields {
-    pub channel: String,
-    pub client_id: String,
-    pub timestamp: DateTime<Utc>,
-    pub sequence_num: u32,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct SubscriptionMessage {
@@ -34,23 +27,13 @@ pub struct HeartbeatEvent {
     heartbeat_counter: u64,
 }
 
-// For the Subscriptions channel
-#[derive(Debug, Deserialize)]
-pub struct SubscriptionDetail {
-    pub heartbeats: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SubscriptionEvent {
-    pub subscriptions: SubscriptionDetail,
-}
-
 // Event enum
 #[derive(Debug)]
 pub enum Event {
     Subscriptions(SubscriptionMessage),
     Heartbeats(HeartbeatMessage),
     Candles(CandlestickMessage),
+    L2Data(Level2Message),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -58,6 +41,13 @@ pub enum Event {
 pub enum TradeSide {
     Buy,
     Sell,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Side {
+    Bid,
+    Offer,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -79,25 +69,6 @@ pub struct CandlestickMessage {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct MarketTradeEvent {
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub trades: Vec<Trade>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Trade {
-    pub trade_id: String,
-    pub product_id: String,
-    #[serde(with = "string_or_float")]
-    pub price: f64,
-    #[serde(with = "string_or_float")]
-    pub size: f64,
-    pub side: TradeSide,
-    pub time: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct CandlestickEvent {
     #[serde(rename = "type")]
     pub event_type: String,
@@ -121,39 +92,50 @@ pub struct Candlestick {
     pub product_id: String,
 }
 
-#[derive(Debug)]
-pub struct OneMinuteCandle {
-    pub open: f64,
-    pub close: f64,
-    pub high: f64,
-    pub low: f64,
-    pub volume: f64,
+#[derive(Debug, Deserialize, Clone)]
+pub struct MarketTradeEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub trades: Vec<Trade>,
 }
 
-impl OneMinuteCandle {
-    pub fn from_trades(trades: &[Trade]) -> Self {
-        let open = trades.first().unwrap().price;
-        let close = trades.last().unwrap().price;
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Trade {
+    pub trade_id: String,
+    pub product_id: String,
+    #[serde(with = "string_or_float")]
+    pub price: f64,
+    #[serde(with = "string_or_float")]
+    pub size: f64,
+    pub side: TradeSide,
+    pub time: DateTime<Utc>,
+}
 
-        let high = trades
-            .iter()
-            .map(|trade| trade.price)
-            .fold(f64::MIN, f64::max);
-        let low = trades
-            .iter()
-            .map(|trade| trade.price)
-            .fold(f64::MAX, f64::min);
+#[derive(Debug, Deserialize, Clone)]
+pub struct Level2Message {
+    pub channel: String,
+    pub client_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub sequence_num: u32,
+    pub events: Vec<Level2Event>,
+}
 
-        let volume = trades.iter().map(|trade| trade.size).sum(); // Compute total volume
+#[derive(Debug, Deserialize, Clone)]
+pub struct Level2Event {
+    #[serde(rename = "type")]
+    event_type: String,
+    product_id: String,
+    pub updates: Vec<L2Data>,
+}
 
-        OneMinuteCandle {
-            open,
-            close,
-            high,
-            low,
-            volume,
-        }
-    }
+#[derive(Debug, Deserialize, Clone)]
+pub struct L2Data {
+    pub side: Side,
+    pub event_time: DateTime<Utc>,
+    #[serde(with = "string_or_float")]
+    pub price_level: f64,
+    #[serde(with = "string_or_float")]
+    pub new_quantity: f64,
 }
 
 pub(crate) mod string_or_float {
@@ -246,6 +228,11 @@ impl<'de> Deserialize<'de> for Event {
                     serde_json::from_value::<CandlestickMessage>(v).map_err(DeError::custom)?;
                 Ok(Event::Candles(message))
             }
+            Some("l2_data") => {
+                let message =
+                    serde_json::from_value::<Level2Message>(v).map_err(DeError::custom)?;
+                Ok(Event::L2Data(message))
+            }
             _ => Err(DeError::custom("Unknown channel")),
         }
     }
@@ -276,7 +263,7 @@ pub struct Account {
     pub hold: Balance,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Balance {
     #[serde(with = "string_or_float")]
     pub value: f64,

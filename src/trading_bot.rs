@@ -1,8 +1,10 @@
 use std::fmt;
 
 use crate::{
-    indicators::{bollinger_bands::BollingerBands, ema::Ema, macd::Macd, rsi::Rsi},
-    model::Candlestick,
+    indicators::{
+        bollinger_bands::BollingerBands, ema::Ema, macd::Macd, order_book::OrderBook, rsi::Rsi,
+    },
+    model::{Candlestick, L2Data, Level2Event},
 };
 
 pub enum TradeSignal {
@@ -23,10 +25,11 @@ impl fmt::Display for TradeSignal {
 
 pub enum IndicatorType {
     Candlestick(Candlestick),
+    L2Data(Level2Event),
 }
 
 pub struct TradingBot {
-    current_price: f64,
+    pub current_price: f64,
     current_candle_time: i64,
     time_count: usize,
     pub can_trade: bool,
@@ -36,6 +39,7 @@ pub struct TradingBot {
     macd: Macd,
     rsi: Rsi,
     b_bands: BollingerBands,
+    pub order_book: OrderBook,
 }
 
 impl TradingBot {
@@ -45,6 +49,7 @@ impl TradingBot {
         let macd = Macd::new(12, 26, 9);
         let rsi = Rsi::new(14);
         let b_bands = BollingerBands::new(20);
+        let order_book = OrderBook::new();
 
         TradingBot {
             current_price: 0.0,
@@ -57,6 +62,7 @@ impl TradingBot {
             macd,
             rsi,
             b_bands,
+            order_book,
         }
     }
 
@@ -77,6 +83,11 @@ impl TradingBot {
 
                 self.current_price = candle_stick.close;
             }
+            IndicatorType::L2Data(l2_data) => {
+                for update in l2_data.updates {
+                    self.order_book.process_side_update(update)
+                }
+            }
         }
     }
 
@@ -93,18 +104,21 @@ impl TradingBot {
         let upper_band = self.b_bands.upper_band.unwrap_or(0.0);
         let rsi = self.rsi.get_rsi().unwrap_or(0.0);
 
+        let (strong_support, strong_resistance) =
+            self.order_book.identify_support_and_resistance(0.5);
+
         if short_ema > long_ema
             && macd_line > macd_signal
-            && self.current_price <= lower_band
-            && rsi < 30.0
+            && (self.current_price <= lower_band || self.current_price <= strong_support)
+            && rsi < 40.0
         {
             return TradeSignal::Buy;
         }
 
         if short_ema < long_ema
             && macd_line < macd_signal
-            && self.current_price >= upper_band
-            && rsi > 70.0
+            && (self.current_price >= upper_band || self.current_price >= strong_resistance)
+            && rsi > 60.0
         {
             return TradeSignal::Sell;
         }
