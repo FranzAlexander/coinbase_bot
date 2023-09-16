@@ -1,176 +1,161 @@
 use std::{
-    collections::VecDeque,
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc,
     },
 };
 
-use account::Account;
-use dotenv::dotenv;
-use futures::{SinkExt, StreamExt};
-use model::{CandlestickEvent, Level2Event, MarketTradeEvent};
-use serde_json::{json, Value};
-
-use tokio::{net::TcpStream, signal, sync::mpsc, task::spawn_blocking, time::Instant};
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tracing::{event, info, instrument, Level};
-use trading_bot::{TradeSignal, TradingBot};
-use util::subscribe;
-
-use crate::{
-    model::{Event, Trade},
-    trading_bot::IndicatorType,
+use anyhow::{Context, Result};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
+use futures::StreamExt;
+use model::Candlestick;
+use tokio::{
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
+    task::spawn_blocking,
 };
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tracing::{event, info, Level};
+use url::Url;
 
-mod account;
+use crate::{model::MarketTradeEvent, trading_bot::TradingBot, util::subscribe};
+
 mod indicators;
 mod model;
 mod trading_bot;
 mod util;
 
+const RECONNECTION_DELAY: u64 = 3;
+
 #[tokio::main]
-async fn main() {
-    // install global collector configured based on RUST_LOG env var.
-    tracing_subscriber::fmt::init();
+async fn main() -> Result<()> {
+    dotenv::dotenv().ok();
 
-    let account = Arc::new(Mutex::new(Account::new()));
-    {
-        let mut locked_acc = account.lock().unwrap();
-        locked_acc.get_wallet().await;
-        locked_acc.update_balances().await;
-    }
-    // WebSocket URL for Coinbase Pro
-    let url = url::Url::parse("wss://advanced-trade-ws.coinbase.com").unwrap();
-
-    // Establish WebSocket connection
-    let (mut ws_stream, _) = connect_async(url).await.unwrap();
-
-    // Channels to subscribe to
-    let channels = vec!["heartbeats", "candles", "level2"];
-    for channel in channels.iter() {
-        subscribe(&mut ws_stream, "XRP-USD", channel, "subscribe").await;
-    }
+    // construct a subscriber that prints formatted traces to stdout
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    // use that subscriber to process traces emitted after this point
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let trading_bot = Arc::new(Mutex::new(TradingBot::new()));
 
-    // // Shared state to check for shutdown
-    let is_terminating = Arc::new(AtomicBool::new(false));
+    let (tx, mut rx) = mpsc::channel::<Vec<MarketTradeEvent>>(250);
 
-    // Start listening for shutdown signals in the background
-    let termination_flag = is_terminating.clone();
-    tokio::spawn(async move {
-        signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
-        termination_flag.store(true, Ordering::Relaxed);
-    });
+    let url = Url::parse("wss://advanced-trade-ws.coinbase.com")
+        .context("Failed to create coinbase url")?;
 
-    let (candle_sender, candle_receiver) = mpsc::channel::<Vec<CandlestickEvent>>(100);
-    let (l2_data_sender, l2_data_receiver) = mpsc::channel::<Vec<Level2Event>>(100);
+    let candle_bot = trading_bot.clone();
 
-    let candlestick_trading_bot = trading_bot.clone();
-    let l2_trading_bot = trading_bot.clone();
+    let candle_keep_going = Arc::new(AtomicBool::new(true));
+    let candle_going = candle_keep_going.clone();
+    let blocking_handler = spawn_blocking(move || candle(&mut rx, candle_bot, candle_going));
 
-    // // Spawn tasks to process data from the channels
-    tokio::spawn(async move {
-        process_candle_stick_stream(candle_receiver, candlestick_trading_bot).await;
-    });
+    let join_handler = tokio::spawn(async move { run(url, tx).await });
 
-    tokio::spawn(async move {
-        process_l2_data_stream(l2_data_receiver, l2_trading_bot).await;
-    });
+    tokio::signal::ctrl_c().await?;
+    println!("Received shutdown signal. Gracefully terminating...");
 
-    while let Some(msg) = ws_stream.next().await {
-        if is_terminating.load(Ordering::Relaxed) {
-            info!("Received shutdown signal. Gracefully terminating...");
-            for channel in channels.iter() {
-                subscribe(&mut ws_stream, "XRP-USD", channel, "unsubscribe").await;
-            }
+    candle_keep_going.store(false, Ordering::SeqCst);
+    join_handler.abort();
+    blocking_handler.abort();
 
-            break;
-        }
+    Ok(())
+}
 
-        if let Ok(Message::Text(text)) = msg {
-            // info!("MSG: {}", text);
-            let event: Event = serde_json::from_str(&text).unwrap();
+async fn run(ws_url: Url, tx: Sender<Vec<MarketTradeEvent>>) -> anyhow::Result<()> {
+    // let mut bot = TradingBot::new();
 
-            match event {
-                Event::Subscriptions(_) => {
-                    event!(Level::INFO, "Subscription");
-                }
-                Event::Heartbeats(_) => {
-                    // event!(Level::INFO, "Heartbeat");
-                }
-                Event::Candles(candles) => {
-                    let _ = candle_sender.send(candles.events).await;
-                }
-                Event::L2Data(l2_data) => {
-                    let _ = l2_data_sender.send(l2_data.events).await;
-                }
-            }
-        }
+    loop {
+        match connect_async(ws_url.clone()).await {
+            Ok((mut ws_stream, _)) => {
+                info!("Connected to server!");
 
-        {
-            let mut locked_bot = trading_bot.lock().unwrap();
-            let locked_acc = account.lock().unwrap();
+                subscribe(&mut ws_stream, "XRP-USD", "subscribe").await;
+                while let Some(msg) = ws_stream.next().await {
+                    if let Ok(Message::Text(text)) = msg {
+                        let event: model::Event =
+                            serde_json::from_str(&text).context("failed to parse message")?;
 
-            if locked_bot.can_trade {
-                let signal = locked_bot.check_trade_signal();
-                match signal {
-                    trading_bot::TradeSignal::Buy => {
-                        info!("BUYING");
-                        if locked_bot.can_trade && locked_acc.can_buy() {
-                            info!("Buy: {}", locked_bot.current_price);
+                        match event {
+                            model::Event::Subscriptions(_) => {}
+                            model::Event::Heartbeats(_) => {}
+                            model::Event::MarketTrades(market_trades) => {
+                                info!("TRADE: {:?}", market_trades);
+                                let _ = tx.send(market_trades.events).await;
+                            }
                         }
                     }
-                    trading_bot::TradeSignal::Sell => {
-                        info!("SELLING");
-
-                        if locked_bot.can_trade && locked_acc.can_sell() {
-                            info!("Sell: {}", locked_bot.current_price);
-                        }
-                    }
-                    trading_bot::TradeSignal::Hold => {}
                 }
-                locked_bot.can_trade = false;
+                event!(
+                    Level::WARN,
+                    "Connection closed, reconnecting in 3 seconds..."
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(RECONNECTION_DELAY)).await;
+            }
+            Err(e) => {
+                event!(
+                    Level::ERROR,
+                    "Failed to connect to {}: {}. Retrying in  seconds...",
+                    ws_url,
+                    e
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(RECONNECTION_DELAY)).await;
             }
         }
     }
-
-    println!("ALL DONE");
 }
 
-async fn process_candle_stick_stream(
-    mut receiver: mpsc::Receiver<Vec<CandlestickEvent>>,
+fn candle(
+    rx: &mut Receiver<Vec<MarketTradeEvent>>,
     trading_bot: Arc<Mutex<TradingBot>>,
+    keep_running: Arc<AtomicBool>,
 ) {
-    while let Some(mut candle_event) = receiver.recv().await {
-        if let Some(candlestick) = candle_event.first_mut() {
-            if candlestick.event_type == "snapshot" {
-                if let Some(last_candle) = candlestick.candles.last() {
-                    let last_candle_start = last_candle.start;
-                    candlestick.candles.retain(|x| x.start == last_candle_start);
+    let mut candlestick: Candlestick = Candlestick::new(Utc::now());
 
-                    let mut locked_bot = trading_bot.lock().unwrap();
-                    for stick in candlestick.candles.iter() {
-                        locked_bot.process_data(IndicatorType::Candlestick(stick.clone()));
+    while keep_running.load(Ordering::Relaxed) {
+        while let Some(x) = rx.blocking_recv() {
+            if let Some(trade_event) = x.first() {
+                if trade_event.event_type == "snapshot" {
+                    let end_time = trade_event.trades[0].time;
+                    let start_time = get_start_time(&end_time);
+
+                    candlestick = Candlestick::new(start_time);
+
+                    for trade in trade_event.trades.iter() {
+                        if trade.time >= start_time && trade.time <= end_time {
+                            candlestick.update(trade.price, trade.size);
+                        }
                     }
-                }
-            } else {
-                let mut locked_bot = trading_bot.lock().unwrap();
-                for stick in candlestick.candles.iter() {
-                    locked_bot.process_data(IndicatorType::Candlestick(stick.clone()));
+                } else {
+                    for trade in trade_event.trades.iter() {
+                        if trade.time > candlestick.end {
+                            {
+                                let mut locked_bot = trading_bot.blocking_lock();
+                                locked_bot.update_bot(candlestick);
+                                println!("{:?}, {:?}", locked_bot.short_ema, locked_bot.long_ema);
+                            }
+                            let start_time = get_start_time(&trade.time);
+                            candlestick = Candlestick::new(start_time);
+                        }
+
+                        candlestick.update(trade.price, trade.size);
+                    }
                 }
             }
         }
     }
 }
 
-async fn process_l2_data_stream(
-    mut receiver: mpsc::Receiver<Vec<Level2Event>>,
-    trading_bot: Arc<Mutex<TradingBot>>,
-) {
-    while let Some(l2_event) = receiver.recv().await {
-        let mut locked_bot = trading_bot.lock().unwrap();
-        locked_bot.process_data(IndicatorType::L2Data(l2_event[0].clone()));
-    }
+fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
+    let start_time: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
+        NaiveDateTime::new(
+            NaiveDate::from_ymd_opt(end_time.year(), end_time.month(), end_time.day()).unwrap(),
+            NaiveTime::from_hms_opt(end_time.hour(), end_time.minute(), 0).unwrap(),
+        ),
+        Utc,
+    );
+
+    start_time
 }

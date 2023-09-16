@@ -11,29 +11,27 @@ type HmacSha256 = Hmac<Sha256>;
 pub async fn subscribe(
     ws_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
     market: &str,
+    channel: &str,
     event: &str,
 ) {
-    let channels = vec!["heartbeats", "market_trades"];
-    for channel in channels.iter() {
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
-        let msg_to_sign = format!("{}{}{}", timestamp, channel, market);
-        let signature = sign_message(&msg_to_sign);
-        let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
+    let timestamp = format!("{}", chrono::Utc::now().timestamp());
+    let msg_to_sign = format!("{}{}{}", timestamp, channel, market);
+    let signature = sign_message(&msg_to_sign);
+    let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
 
-        let subscribe_msg = json!({
-            "type": event.to_string(),
-            "product_ids": [market],
-            "channel": channel,
-            "api_key": api_key,
-            "timestamp": timestamp,
-            "signature": signature
-        });
+    let subscribe_msg = json!({
+        "type": event.to_string(),
+        "product_ids": [market],
+        "channel": channel,
+        "api_key": api_key,
+        "timestamp": timestamp,
+        "signature": signature
+    });
 
-        ws_stream
-            .send(Message::Text(subscribe_msg.to_string()))
-            .await
-            .unwrap();
-    }
+    ws_stream
+        .send(Message::Text(subscribe_msg.to_string()))
+        .await
+        .unwrap();
 }
 
 // pub async fn get_wallet(api_key: &str, api_secret: &str) -> String {}
