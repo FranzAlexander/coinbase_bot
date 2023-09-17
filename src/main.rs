@@ -21,8 +21,11 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{event, info, Level};
 use url::Url;
 
-use crate::{model::MarketTradeEvent, trading_bot::TradingBot, util::subscribe};
+use crate::{
+    account::BotAccount, model::MarketTradeEvent, trading_bot::TradingBot, util::subscribe,
+};
 
+mod account;
 mod indicators;
 mod model;
 mod trading_bot;
@@ -32,12 +35,15 @@ const RECONNECTION_DELAY: u64 = 3;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv::dotenv().ok();
-
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber)?;
+
+    let mut bot_account = BotAccount::new();
+    bot_account.update_balances().await;
+
+    println!("Account: {:?}", bot_account);
 
     let trading_bot = Arc::new(Mutex::new(TradingBot::new()));
 
