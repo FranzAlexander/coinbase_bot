@@ -4,7 +4,7 @@ use serde_json::Value;
 use sha2::Sha256;
 use uuid::Uuid;
 
-use crate::model::account::{AccountList, Balance, Product};
+use crate::model::account::{AccountList, Balance, CurrentTrade, Product};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -19,6 +19,7 @@ pub struct BotAccount {
     pub currency: Option<Balance>,
     api_key: String,
     secret_key: String,
+    trade: Option<CurrentTrade>,
 }
 
 impl BotAccount {
@@ -35,6 +36,7 @@ impl BotAccount {
             currency: None,
             api_key,
             secret_key,
+            trade: None,
         }
     }
 
@@ -88,7 +90,7 @@ impl BotAccount {
         let client_order_id = Uuid::new_v4().to_string();
     }
 
-    async fn get_product(&self) -> Option<Product> {
+    pub async fn get_product(&self) -> Option<Product> {
         if let Some(asset) = &self.asset {
             let timestamp = format!("{}", chrono::Utc::now().timestamp());
 
@@ -109,19 +111,6 @@ impl BotAccount {
                 .expect("Failed to parse response as json");
 
             Some(response)
-            // match response {
-            //     Ok(resp) => {
-            //         let text = resp.text().await.expect("Failed to read the response body");
-            //         if let Ok(product) = serde_json::from_str::<Product>(&text) {
-            //             println!("{:?}", product);
-            //         } else {
-            //             eprintln!("Failed to parse response as JSON: {}", text);
-            //         }
-            //     }
-            //     Err(err) => {
-            //         eprintln!("Error fetching the product: {:?}", err);
-            //     }
-            // }
         } else {
             None
         }

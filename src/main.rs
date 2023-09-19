@@ -5,7 +5,7 @@ use std::sync::{
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use model::{candlestick::Candlestick, event::MarketTradeEvent};
 
 use tokio::{
@@ -91,20 +91,26 @@ async fn run(
 
                 subscribe(&mut ws_stream, "BTC-USD", "subscribe").await;
                 while let Some(msg) = ws_stream.next().await {
-                    if let Ok(Message::Text(text)) = msg {
-                        let event: Event = serde_json::from_str(&text)
-                            .context("failed to parse message")
-                            .unwrap();
+                    match msg.unwrap() {
+                        Message::Text(text) => {
+                            let event: Event = serde_json::from_str(&text)
+                                .context("failed to parse message")
+                                .unwrap();
 
-                        match event {
-                            Event::Subscriptions(_) => {}
-                            Event::Heartbeats(_) => {}
-                            Event::MarketTrades(market_trades) => {
-                                let _ = tx.send(market_trades).await;
+                            match event {
+                                Event::Subscriptions(_) => {}
+                                Event::Heartbeats(heartbeat) => {
+                                    info!("{:?}", heartbeat);
+                                }
+                                Event::MarketTrades(market_trades) => {
+                                    let _ = tx.send(market_trades).await;
+                                }
+                                Event::Ticker(ticker) => {}
                             }
-                            Event::Ticker(ticker) => {
-                                info!("TICKER: {:?}", ticker);
-                            }
+                        }
+                        Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => (),
+                        Message::Close(e) => {
+                            info!("Connection closed: {:?}", e)
                         }
                     }
                 }
@@ -188,6 +194,9 @@ fn trading_bot_run(
             println!("{:?}", candlestick);
             let mut locked_bot = trading_bot.blocking_lock();
             locked_bot.update_bot(candlestick);
+            let signal = locked_bot.get_signal();
+
+            println!("Trading Signal: {:?}", signal);
         }
     }
 }

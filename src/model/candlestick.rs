@@ -1,4 +1,4 @@
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Duration, Timelike, Utc};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -14,7 +14,7 @@ pub struct Candlestick {
 
 impl Candlestick {
     pub fn new(start_time: DateTime<Utc>) -> Self {
-        let end_time = start_time.with_minute(start_time.minute() + 1).unwrap();
+        let end_time = start_time + Duration::minutes(1);
         Candlestick {
             start: start_time,
             end: end_time,

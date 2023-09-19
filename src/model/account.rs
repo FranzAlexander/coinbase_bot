@@ -46,5 +46,12 @@ pub struct Balance {
 #[derive(Debug, Deserialize)]
 pub struct Product {
     #[serde(with = "string_or_float")]
-    price: f64,
+    pub price: f64,
+}
+
+#[derive(Debug)]
+pub struct CurrentTrade {
+    pub price: f64,
+    pub amount: f64,
+    pub stop_loss: f64,
 }

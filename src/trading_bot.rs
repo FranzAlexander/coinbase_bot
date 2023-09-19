@@ -49,17 +49,23 @@ impl TradingBot {
     }
 
     pub fn get_signal(&self) -> TradeSignal {
-        let short_ema = self.short_ema.prev_ema.unwrap_or(0.0);
-        let long_ema = self.long_ema.prev_ema.unwrap_or(0.0);
+        if let (Some(short_ema), Some(long_ema), Some(macd_line), Some(macd_signal)) = (
+            self.short_ema.prev_ema,
+            self.long_ema.prev_ema,
+            self.macd.prev_ema,
+            self.macd.get_signal(),
+        ) {
+            if short_ema > long_ema && macd_line > macd_signal {
+                return TradeSignal::Buy;
+            }
 
-        if short_ema > long_ema {
-            return TradeSignal::Buy;
+            if short_ema < long_ema && macd_line < macd_signal {
+                return TradeSignal::Sell;
+            }
+
+            TradeSignal::Hold
+        } else {
+            TradeSignal::Hold
         }
-
-        if short_ema < long_ema {
-            return TradeSignal::Sell;
-        }
-
-        TradeSignal::Hold
     }
 }

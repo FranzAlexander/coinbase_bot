@@ -5,7 +5,7 @@ pub struct Macd {
     short_ema: Ema,
     long_ema: Ema,
     signal: Ema,
-    prev_ema: Option<f64>,
+    pub prev_ema: Option<f64>,
 }
 
 impl Macd {
