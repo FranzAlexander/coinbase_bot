@@ -2,12 +2,15 @@ use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::Value;
 use sha2::Sha256;
+use uuid::Uuid;
 
-use crate::model::{AccountList, Balance};
+use crate::model::account::{AccountList, Balance, Product};
 
 type HmacSha256 = Hmac<Sha256>;
 
-const API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
+const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
+const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
+const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
 
 #[derive(Debug)]
 pub struct BotAccount {
@@ -41,7 +44,7 @@ impl BotAccount {
         for account in accounts.accounts.into_iter() {
             if account.available_balance.currency == "USDC" {
                 self.currency = Some(account.available_balance);
-            } else if account.available_balance.currency == "XRP" {
+            } else if account.available_balance.currency == "BTC" {
                 self.asset = Some(account.available_balance)
             }
         }
@@ -67,9 +70,9 @@ impl BotAccount {
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         // Make the GET request with headers
-        let response: Value = self
+        let account: AccountList = self
             .client
-            .get(API_URL)
+            .get(ACCOUNT_API_URL)
             .headers(headers)
             .send()
             .await
@@ -78,8 +81,67 @@ impl BotAccount {
             .await
             .unwrap();
 
-        let account: AccountList = serde_json::from_value(response).unwrap();
         account
+    }
+
+    pub async fn create_n_send_order(&self) {
+        let client_order_id = Uuid::new_v4().to_string();
+    }
+
+    async fn get_product(&self) -> Option<Product> {
+        if let Some(asset) = &self.asset {
+            let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+            let signature = self.sign(&timestamp, "GET", "/api/v3/brokerage/products/BTC-USD", "");
+
+            let headers = self.create_headers(&timestamp, &signature);
+
+            let url = format!("{}/{}-{}", PRODUCT_API_URL, asset.currency, "USD");
+            let response: Product = self
+                .client
+                .get(&url)
+                .headers(headers)
+                .send()
+                .await
+                .expect("Error fetching the product")
+                .json()
+                .await
+                .expect("Failed to parse response as json");
+
+            Some(response)
+            // match response {
+            //     Ok(resp) => {
+            //         let text = resp.text().await.expect("Failed to read the response body");
+            //         if let Ok(product) = serde_json::from_str::<Product>(&text) {
+            //             println!("{:?}", product);
+            //         } else {
+            //             eprintln!("Failed to parse response as JSON: {}", text);
+            //         }
+            //     }
+            //     Err(err) => {
+            //         eprintln!("Error fetching the product: {:?}", err);
+            //     }
+            // }
+        } else {
+            None
+        }
+    }
+
+    fn create_headers(&self, timestamp: &str, signature: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+
+        headers.insert(
+            "CB-ACCESS-KEY",
+            HeaderValue::from_str(&self.api_key).unwrap(),
+        );
+        headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(&signature).unwrap());
+        headers.insert(
+            "CB-ACCESS-TIMESTAMP",
+            HeaderValue::from_str(&timestamp).unwrap(),
+        );
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        headers
     }
 
     fn sign(&self, timestamp: &str, method: &str, request_path: &str, body: &str) -> String {

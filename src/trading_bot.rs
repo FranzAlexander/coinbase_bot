@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::{
     indicators::{ema::Ema, macd::Macd, obv::Obv},
-    model::Candlestick,
+    model::candlestick::Candlestick,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
