@@ -19,6 +19,17 @@ pub enum Side {
     Offer,
 }
 
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum OrderStatus {
+    Pending,
+    Open,
+    Filled,
+    Cancelled,
+    Expired,
+    Failed,
+}
+
 pub(crate) mod string_or_float {
     use std::fmt;
 

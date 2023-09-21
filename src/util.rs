@@ -1,5 +1,6 @@
 use futures::SinkExt;
 use hmac::{Hmac, Mac};
+use reqwest::header::HeaderMap;
 use serde_json::json;
 use sha2::Sha256;
 use tokio::{net::TcpStream, signal, sync::mpsc, time::Instant};
@@ -13,7 +14,7 @@ pub async fn subscribe(
     market: &str,
     event: &str,
 ) {
-    let channels = vec!["heartbeats", "market_trades", "ticker_batch"];
+    let channels = vec!["heartbeats", "market_trades", "ticker_batch", "user"];
     for channel in channels.iter() {
         let timestamp = format!("{}", chrono::Utc::now().timestamp());
         let msg_to_sign = format!("{}{}{}", timestamp, channel, market);
@@ -36,8 +37,6 @@ pub async fn subscribe(
     }
 }
 
-// pub async fn get_wallet(api_key: &str, api_secret: &str) -> String {}
-
 fn sign_message(message: &str) -> String {
     let api_secret = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
 
@@ -46,4 +45,34 @@ fn sign_message(message: &str) -> String {
 
     mac.update(message.as_bytes());
     format!("{:x}", mac.finalize().into_bytes())
+}
+
+pub async fn send_get_request<T: for<'de> serde::Deserialize<'de>>(
+    client: &reqwest::Client,
+    url: &str,
+    headers: HeaderMap,
+) -> Result<T, reqwest::Error> {
+    client
+        .get(url)
+        .headers(headers)
+        .send()
+        .await?
+        .json::<T>()
+        .await
+}
+
+pub fn http_sign(
+    secret_key: &[u8],
+    timestamp: &str,
+    method: &str,
+    request_path: &str,
+    body: &str,
+) -> String {
+    let message = format!("{}{}{}{}", timestamp, method, request_path, body);
+
+    let mut mac = HmacSha256::new_from_slice(secret_key).expect("HMAC can take key of any size");
+    mac.update(message.as_bytes());
+    let result = mac.finalize();
+
+    format!("{:x}", result.into_bytes())
 }

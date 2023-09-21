@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use super::string_or_float;
+use super::{string_or_float, OrderStatus};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -50,8 +51,11 @@ pub struct Product {
 }
 
 #[derive(Debug)]
-pub struct CurrentTrade {
+pub struct ActiveTrade {
+    pub order_id: Uuid,
+    pub client_order_id: Uuid,
     pub price: f64,
     pub amount: f64,
     pub stop_loss: f64,
+    pub status: OrderStatus,
 }
