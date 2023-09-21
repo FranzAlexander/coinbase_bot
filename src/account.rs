@@ -14,19 +14,19 @@ use crate::{
     util::{http_sign, send_get_request},
 };
 
-type HmacSha256 = Hmac<Sha256>;
-
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
 
-const MARKUP_PERCENTAGE: f64 = 0.0002;
+const STOP_LOSS_PERCENTAGE: f64 = 0.002;
+const BALANCE_CURRENCY: &str = "USD";
+const COIN_CURRENCY: &str = "USDC";
+const COIN_SYMBOL: &str = "XRP";
 
 #[derive(Debug)]
 pub struct BotAccount {
     client: reqwest::Client,
-    asset: Option<Balance>,
-    currency: Option<Balance>,
+    balances: Vec<Balance>,
     api_key: String,
     secret_key: String,
     pub active_trade: Option<ActiveTrade>,
@@ -42,8 +42,7 @@ impl BotAccount {
 
         BotAccount {
             client,
-            asset: None,
-            currency: None,
+            balances: Vec::new(),
             api_key,
             secret_key,
             active_trade: None,
@@ -54,12 +53,18 @@ impl BotAccount {
         let accounts = self.get_wallet().await;
 
         for account in accounts.accounts.into_iter() {
-            if account.available_balance.currency == "USDC" {
-                self.currency = Some(account.available_balance);
-            } else if account.available_balance.currency == "BTC" {
-                self.asset = Some(account.available_balance)
+            if let Some(pos) = self
+                .balances
+                .iter()
+                .position(|x| x.currency == account.available_balance.currency)
+            {
+                self.balances[pos] = account.available_balance.clone();
+            } else {
+                self.balances.push(account.available_balance.clone());
             }
         }
+
+        println!("{:?}", self.balances);
     }
 
     async fn get_wallet(&self) -> AccountList {
@@ -77,23 +82,27 @@ impl BotAccount {
         // Create headers
         let headers = self.create_headers(timestamp.as_str(), signature.as_str());
 
-        let account = send_get_request::<AccountList>(&self.client, &ACCOUNT_API_URL, headers)
+        send_get_request::<AccountList>(&self.client, ACCOUNT_API_URL, headers)
             .await
-            .expect("Failed to send get request!");
-
-        account
+            .expect("Failed to send get request!")
     }
 
     pub async fn create_buy_order(&mut self) {
         let client_order_id = Uuid::new_v4().to_string();
 
-        let current_price = self.get_product().await.unwrap();
+        let amount = self.get_balance_value_by_currency(COIN_CURRENCY);
 
-        let base_amount = self.currency.as_ref().unwrap().value / current_price.price;
-        let rounded_base_amount = format!("{:.8}", base_amount);
+        let rounded_base_amount = format!("{:.2}", amount);
 
-        let desired_price = current_price.price * (1.0 + MARKUP_PERCENTAGE);
-        let rounded_desired_price = format!("{:.8}", desired_price);
+        let body = serde_json::json!({
+                "client_order_id": client_order_id,
+                "product_id":"XRP-USDC",
+                "side": "BUY",
+                "order_configuration":{
+                   "market_market_ioc":{
+                    "quote_size": rounded_base_amount
+                   }
+        }});
 
         let timestamp = format!("{}", chrono::Utc::now().timestamp());
 
@@ -102,7 +111,7 @@ impl BotAccount {
             &timestamp,
             "POST",
             "/api/v3/brokerage/orders",
-            "",
+            &body.to_string(),
         );
 
         let headers = self.create_headers(&timestamp, &signature);
@@ -111,46 +120,23 @@ impl BotAccount {
             .client
             .post(ORDER_API_URL)
             .headers(headers)
-            .json(&serde_json::json!({
-                "client_order_id": client_order_id,
-                "product_id":"BTC-USD",
-                "side": "BUY",
-                "order_configuration":{
-                    "limit_limit_gtc":{
-                        "base_size": rounded_base_amount.to_string(),
-                        "limit_price": rounded_desired_price.to_string(),
-                        "post_only": true
-                    }
-                }
-            }))
+            .json(&body)
             .send()
             .await;
 
         match order {
             Ok(response) => {
-                let order_response: OrderResponse = response.json().await.unwrap();
+                let order_response = response.json::<Value>().await;
 
-                if order_response.success {
-                    self.active_trade = Some(ActiveTrade {
-                        order_id: order_response.success_response.order_id,
-                        client_order_id: order_response.success_response.client_order_id,
-                        amount: order_response.limit_limit_gtc.base_size,
-                        price: order_response.limit_limit_gtc.limit_price,
-                        stop_loss: 0.0,
-                        status: OrderStatus::Open,
-                    });
-
-                    self.currency.as_mut().unwrap().value -=
-                        order_response.limit_limit_gtc.limit_price;
-
-                    self.asset.as_mut().unwrap().value += order_response.limit_limit_gtc.base_size;
-
-                    event!(
-                        Level::INFO,
-                        "Successful Buy! Price: {}, Amount: {}",
-                        order_response.limit_limit_gtc.limit_price,
-                        order_response.limit_limit_gtc.base_size
-                    );
+                match order_response {
+                    Ok(order) => {
+                        let response: OrderResponse =
+                            serde_json::from_value(order).expect("Failed to convert json");
+                        if response.success {
+                            event!(Level::INFO, "Successfuly brought: {}", COIN_SYMBOL);
+                        }
+                    }
+                    Err(e) => println!("Error: {:?}", e),
                 }
             }
             Err(e) => {
@@ -162,23 +148,27 @@ impl BotAccount {
     pub async fn create_sell_order(&mut self) {
         let client_order_id = self.active_trade.as_ref().unwrap().client_order_id;
 
-        let current_price = self.get_product().await.unwrap();
-
-        let base_amount = self.asset.as_ref().unwrap().value; // Amount you want to sell
-        let rounded_base_amount = format!("{:.8}", base_amount);
-
-        // And perhaps a different logic for the desired_price:
-        let desired_price = current_price.price * (1.0 - MARKUP_PERCENTAGE); // Selling at a markdown for quick sale?
-        let rounded_desired_price = format!("{:.8}", desired_price);
+        let base_amount = self.get_balance_value_by_currency(COIN_SYMBOL); // Amount you want to sell
+        let rounded_base_amount = format!("{:.6}", base_amount);
 
         let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+        let body = serde_json::json!({
+                "client_order_id": client_order_id,
+                "product_id":"XRP-USDC",
+                "side": "SELL",
+                "order_configuration":{
+                   "market_market_ioc":{
+                    "quote_size": rounded_base_amount
+                   }
+        }});
 
         let signature = http_sign(
             self.secret_key.as_bytes(),
             &timestamp,
             "POST",
             "/api/v3/brokerage/orders",
-            "",
+            &body.to_string(),
         );
 
         let headers = self.create_headers(&timestamp, &signature);
@@ -187,18 +177,7 @@ impl BotAccount {
             .client
             .post(ORDER_API_URL)
             .headers(headers)
-            .json(&serde_json::json!({
-                "client_order_id": client_order_id,
-                "product_id":"BTC-USD",
-                "side": "SELL",
-                "order_configuration":{
-                    "limit_limit_gtc":{
-                        "base_size": rounded_base_amount.to_string(),
-                        "limit_price": rounded_desired_price.to_string(),
-                        "post_only": true
-                    }
-                }
-            }))
+            .json(&body)
             .send()
             .await;
 
@@ -209,17 +188,7 @@ impl BotAccount {
                 if order_response.success {
                     self.active_trade = None;
 
-                    self.currency.as_mut().unwrap().value +=
-                        order_response.limit_limit_gtc.limit_price;
-
-                    self.asset.as_mut().unwrap().value -= order_response.limit_limit_gtc.base_size;
-
-                    event!(
-                        Level::INFO,
-                        "Successful Sell! Price: {}, Amount: {}",
-                        order_response.limit_limit_gtc.limit_price,
-                        order_response.limit_limit_gtc.base_size
-                    );
+                    event!(Level::INFO, "Successfuly Sold: {}", COIN_SYMBOL);
                 }
             }
             Err(e) => {
@@ -228,30 +197,24 @@ impl BotAccount {
         }
     }
 
-    pub async fn get_product(&self) -> Option<Product> {
-        if let Some(asset) = &self.asset {
-            let timestamp = format!("{}", chrono::Utc::now().timestamp());
+    pub async fn get_product(&self) -> Product {
+        let timestamp = format!("{}", chrono::Utc::now().timestamp());
 
-            let signature = http_sign(
-                self.secret_key.as_bytes(),
-                &timestamp,
-                "GET",
-                "/api/v3/brokerage/products/BTC-USD",
-                "",
-            );
+        let signature = http_sign(
+            self.secret_key.as_bytes(),
+            &timestamp,
+            "GET",
+            "/api/v3/brokerage/products/XRP-USD",
+            "",
+        );
 
-            let headers = self.create_headers(&timestamp, &signature);
+        let headers = self.create_headers(&timestamp, &signature);
 
-            let url = format!("{}/{}-{}", PRODUCT_API_URL, asset.currency, "USD");
+        let url = format!("{}/{}-{}", PRODUCT_API_URL, COIN_SYMBOL, BALANCE_CURRENCY);
 
-            let res = send_get_request::<Product>(&self.client, &url, headers)
-                .await
-                .expect("Failed to send message");
-
-            Some(res)
-        } else {
-            None
-        }
+        send_get_request::<Product>(&self.client, &url, headers)
+            .await
+            .expect("Failed to send message")
     }
 
     fn create_headers(&self, timestamp: &str, signature: &str) -> HeaderMap {
@@ -261,10 +224,10 @@ impl BotAccount {
             "CB-ACCESS-KEY",
             HeaderValue::from_str(&self.api_key).unwrap(),
         );
-        headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(&signature).unwrap());
+        headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(signature).unwrap());
         headers.insert(
             "CB-ACCESS-TIMESTAMP",
-            HeaderValue::from_str(&timestamp).unwrap(),
+            HeaderValue::from_str(timestamp).unwrap(),
         );
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
@@ -275,5 +238,13 @@ impl BotAccount {
         if self.active_trade.is_some() {
             self.active_trade.as_mut().unwrap().status = status
         }
+    }
+
+    fn get_balance_value_by_currency(&self, currency: &str) -> f64 {
+        self.balances
+            .iter()
+            .find(|x| x.currency == currency)
+            .expect("Failed to find currency")
+            .value
     }
 }

@@ -37,7 +37,7 @@ pub struct Account {
     pub hold: Balance,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Balance {
     #[serde(with = "string_or_float")]
     pub value: f64,

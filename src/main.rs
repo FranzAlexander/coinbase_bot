@@ -16,7 +16,7 @@ use tokio::{
     task::spawn_blocking,
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{event, info, Level};
+use tracing::{error, event, info, Level};
 use url::Url;
 
 use crate::{
@@ -107,29 +107,34 @@ async fn run(
 
                 subscribe(&mut ws_stream, "BTC-USD", "subscribe").await;
                 while let Some(msg) = ws_stream.next().await {
-                    match msg.unwrap() {
-                        Message::Text(text) => {
-                            let event: Event = serde_json::from_str(&text)
-                                .context("failed to parse message")
-                                .unwrap();
+                    match msg {
+                        Ok(event_msg) => match event_msg {
+                            Message::Text(text) => {
+                                let event: Event = serde_json::from_str(&text)
+                                    .context("failed to parse message")
+                                    .unwrap();
 
-                            match event {
-                                Event::Subscriptions(_) => {}
-                                Event::Heartbeats(heartbeat) => {
-                                    info!("{:?}", heartbeat);
-                                }
-                                Event::MarketTrades(market_trades) => {
-                                    let _ = tx.send(market_trades).await;
-                                }
-                                Event::Ticker(ticker) => {}
-                                Event::User(user) => {
-                                    let _ = user_tx.send(user).await;
+                                match event {
+                                    Event::Subscriptions(_) => {}
+                                    Event::Heartbeats(heartbeat) => {
+                                        info!("{:?}", heartbeat);
+                                    }
+                                    Event::MarketTrades(market_trades) => {
+                                        let _ = tx.send(market_trades).await;
+                                    }
+                                    Event::Ticker(ticker) => {}
+                                    Event::User(user) => {
+                                        let _ = user_tx.send(user).await;
+                                    }
                                 }
                             }
-                        }
-                        Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => (),
-                        Message::Close(e) => {
-                            info!("Connection closed: {:?}", e)
+                            Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => (),
+                            Message::Close(e) => {
+                                info!("Connection closed: {:?}", e)
+                            }
+                        },
+                        Err(e) => {
+                            error!("Error with websocket: {:?}", e)
                         }
                     }
                 }
@@ -245,9 +250,13 @@ async fn bot_account_run(
         }
 
         if let Some(signal) = signal_rx.recv().await {
-            if signal == TradeSignal::Sell && bot_account.active_trade.is_some() {}
+            if signal == TradeSignal::Sell && bot_account.active_trade.is_some() {
+                bot_account.create_sell_order().await;
+            }
 
-            if signal == TradeSignal::Buy && bot_account.active_trade.is_none() {}
+            if signal == TradeSignal::Buy && bot_account.active_trade.is_none() {
+                bot_account.create_buy_order().await;
+            }
         }
     }
 }

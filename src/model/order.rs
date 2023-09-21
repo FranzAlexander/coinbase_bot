@@ -5,36 +5,18 @@ use super::{string_or_float, TradeSide};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename = "snake_case")]
-pub struct LimitLimitGtc {
-    #[serde(with = "string_or_float")]
-    pub base_size: f64,
-    #[serde(with = "string_or_float")]
-    pub limit_price: f64,
-    pub post_only: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename = "snake_case")]
-pub struct OrderConfiguration {
-    market_market_ioc: LimitLimitGtc,
-}
-
-#[derive(Serialize)]
-pub struct CreateOrder {
-    client_order_id: String,
-    product_id: String,
-    side: TradeSide, // You can change this to an enum as well if you always match the order side with MarketOrder
-    order_configuration: OrderConfiguration,
+pub struct MarketMarketIoc {
+    pub quote_size: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct OrderResponse {
     pub success: bool,
-    pub failure_reason: Option<String>,
+    pub failure_reason: String,
     pub order_id: Uuid,
     pub success_response: SuccessResponse,
     pub error_response: ErrorResponse,
-    pub limit_limit_gtc: LimitLimitGtc,
+    pub market_market_ioc: MarketMarketIoc,
 }
 
 #[derive(Deserialize)]
