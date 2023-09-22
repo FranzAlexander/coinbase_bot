@@ -196,16 +196,9 @@ fn candle(
     }
 }
 
+#[inline]
 fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
-    let start_time: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
-        NaiveDateTime::new(
-            NaiveDate::from_ymd_opt(end_time.year(), end_time.month(), end_time.day()).unwrap(),
-            NaiveTime::from_hms_opt(end_time.hour(), end_time.minute(), 0).unwrap(),
-        ),
-        Utc,
-    );
-
-    start_time
+    end_time.with_second(0).expect("Failed to set seconds to 0")
 }
 
 fn trading_bot_run(
@@ -216,12 +209,10 @@ fn trading_bot_run(
 ) {
     while keep_running.load(Ordering::Relaxed) {
         if let Some(candlestick) = rx.blocking_recv() {
-            println!("{:?}", candlestick);
             let mut locked_bot = trading_bot.blocking_lock();
             locked_bot.update_bot(candlestick);
             let signal = locked_bot.get_signal();
-
-            println!("Trading Signal: {:?}", signal);
+            let _ = signal_tx.blocking_send(signal);
         }
     }
 }
