@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 pub mod account;
@@ -5,11 +7,20 @@ pub mod candlestick;
 pub mod event;
 pub mod order;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TradeSide {
     Buy,
     Sell,
+}
+
+impl fmt::Display for TradeSide {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TradeSide::Buy => write!(f, "BUY"),
+            TradeSide::Sell => write!(f, "SELL"),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]

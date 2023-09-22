@@ -14,7 +14,7 @@ pub async fn subscribe(
     market: &str,
     event: &str,
 ) {
-    let channels = vec!["heartbeats", "market_trades", "ticker_batch", "user"];
+    let channels = vec!["heartbeats", "market_trades", "ticker_batch"];
     for channel in channels.iter() {
         let timestamp = format!("{}", chrono::Utc::now().timestamp());
         let msg_to_sign = format!("{}{}{}", timestamp, channel, market);

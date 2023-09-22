@@ -21,7 +21,7 @@ use url::Url;
 
 use crate::{
     account::BotAccount,
-    model::event::{Event, UserEvent},
+    model::event::{Event, Ticker, TickerEvent, UserEvent},
     trading_bot::{TradeSignal, TradingBot},
     util::subscribe,
 };
@@ -46,8 +46,8 @@ async fn main() -> Result<()> {
     // Create a channel for sending and receiving MarketTradeEvent objects with a buffer size of 250.
     let (tx, mut rx) = mpsc::channel::<Vec<MarketTradeEvent>>(100);
     let (tradeing_bot_tx, mut trading_bot_rx) = mpsc::channel::<Candlestick>(10);
-    let (user_tx, mut user_rx) = mpsc::channel::<Vec<UserEvent>>(10);
-    let (bot_signal_tx, mut bot_signal_rx) = mpsc::channel::<TradeSignal>(2);
+    let (ticker_tx, mut ticker_rx) = mpsc::channel::<Vec<TickerEvent>>(10);
+    let (bot_signal_tx, mut bot_signal_rx) = mpsc::channel::<TradeSignal>(50);
 
     // Parse the WebSocket URL for the Coinbase exchange.
     let url = Url::parse("wss://advanced-trade-ws.coinbase.com")
@@ -77,9 +77,9 @@ async fn main() -> Result<()> {
 
     // Spawn a Tokio async task to run the WebSocket component with the provided parameters.
     let join_handler =
-        tokio::spawn(async move { run(url, tx, user_tx, websocket_keep_running).await });
+        tokio::spawn(async move { run(url, tx, ticker_tx, websocket_keep_running).await });
     let bot_account_handler = tokio::spawn(async move {
-        bot_account_run(&mut user_rx, &mut bot_signal_rx, bot_account_keep_running).await
+        bot_account_run(&mut ticker_rx, &mut bot_signal_rx, bot_account_keep_running).await
     });
 
     tokio::signal::ctrl_c().await?;
@@ -97,7 +97,7 @@ async fn main() -> Result<()> {
 async fn run(
     ws_url: Url,
     tx: Sender<Vec<MarketTradeEvent>>,
-    user_tx: Sender<Vec<UserEvent>>,
+    ticker_tx: Sender<Vec<TickerEvent>>,
     keep_running: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     while keep_running.load(Ordering::Relaxed) {
@@ -105,7 +105,7 @@ async fn run(
             Ok((mut ws_stream, _)) => {
                 info!("Connected to server!");
 
-                subscribe(&mut ws_stream, "BTC-USD", "subscribe").await;
+                subscribe(&mut ws_stream, "XRP-USD", "subscribe").await;
                 while let Some(msg) = ws_stream.next().await {
                     match msg {
                         Ok(event_msg) => match event_msg {
@@ -122,9 +122,8 @@ async fn run(
                                     Event::MarketTrades(market_trades) => {
                                         let _ = tx.send(market_trades).await;
                                     }
-                                    Event::Ticker(ticker) => {}
-                                    Event::User(user) => {
-                                        let _ = user_tx.send(user).await;
+                                    Event::Ticker(ticker) => {
+                                        let _ = ticker_tx.send(ticker).await;
                                     }
                                 }
                             }
@@ -183,6 +182,8 @@ fn candle(
                 } else {
                     for trade in trade_event.trades.iter() {
                         if trade.time > candlestick.end {
+                            info!("Candlestick: {:?}", candlestick);
+
                             let _ = tx.blocking_send(candlestick);
                             let start_time = get_start_time(&trade.time);
                             candlestick = Candlestick::new(start_time);
@@ -201,6 +202,15 @@ fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
     end_time.with_second(0).expect("Failed to set seconds to 0")
 }
 
+// #[inline]
+// fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
+//     let seconds = end_time.second();
+//     let rounded_seconds = if seconds >= 30 { 30 } else { 0 };
+//     end_time
+//         .with_second(rounded_seconds)
+//         .expect("Failed to set seconds")
+// }
+
 fn trading_bot_run(
     rx: &mut Receiver<Candlestick>,
     signal_tx: Sender<TradeSignal>,
@@ -218,7 +228,7 @@ fn trading_bot_run(
 }
 
 async fn bot_account_run(
-    user_rx: &mut Receiver<Vec<UserEvent>>,
+    ticker_rx: &mut Receiver<Vec<TickerEvent>>,
     signal_rx: &mut Receiver<TradeSignal>,
     keep_running: Arc<AtomicBool>,
 ) {
@@ -226,28 +236,60 @@ async fn bot_account_run(
     bot_account.update_balances().await;
 
     while keep_running.load(Ordering::Relaxed) {
-        if let Some(user_event) = user_rx.recv().await {
-            for event in user_event.iter() {
-                if event.event_type == "update" {
-                    for order in event.orders.iter() {
-                        if bot_account.active_trade.as_ref().unwrap().client_order_id
-                            == order.client_order_id
-                        {
-                            bot_account.update_active_trade_status(order.status);
+        tokio::select! {
+            Some(ticker_event) = ticker_rx.recv() => {
+                for ticker_event in ticker_event.iter() {
+                    for event in &ticker_event.tickers {
+                        let price = event.price;
+                        if bot_account.active_trade.active &&  price < bot_account.active_trade.stop_loss{
+
+                                bot_account.create_order(model::TradeSide::Sell).await;
+
                         }
+                        // if let Some(active_trade) = &bot_account.active_trade {
+                        //     if price <= active_trade.stop_loss {
+                        //         bot_account.create_order(model::TradeSide::Sell).await;
+                        //     }
+                        // }
                     }
+                }
+            }
+            Some(signal) = signal_rx.recv() => {
+                if signal == TradeSignal::Sell && bot_account.active_trade.active == true{
+                    bot_account.create_order(model::TradeSide::Sell).await;
+                    bot_account.update_balances().await;
+                }
+
+                if signal == TradeSignal::Buy && bot_account.active_trade.active == false{
+                    bot_account.create_order(model::TradeSide::Buy).await;
+                    bot_account.update_balances().await;
                 }
             }
         }
 
-        if let Some(signal) = signal_rx.recv().await {
-            if signal == TradeSignal::Sell && bot_account.active_trade.is_some() {
-                bot_account.create_sell_order().await;
-            }
+        // if let Some(ticker_event) = ticker_rx.recv().await {
+        //     for ticker_event in ticker_event.iter() {
+        //         for event in &ticker_event.tickers {
+        //             let price = event.price;
+        //             if let Some(active_trade) = &bot_account.active_trade {
+        //                 if price <= active_trade.stop_loss {
+        //                     bot_account.create_order(model::TradeSide::Sell).await;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-            if signal == TradeSignal::Buy && bot_account.active_trade.is_none() {
-                bot_account.create_buy_order().await;
-            }
-        }
+        // if let Some(signal) = signal_rx.recv().await {
+        //     if signal == TradeSignal::Sell && bot_account.active_trade.is_some() {
+        //         bot_account.create_order(model::TradeSide::Sell).await;
+        //         bot_account.update_balances().await;
+        //     }
+
+        //     if signal == TradeSignal::Buy && bot_account.active_trade.is_none() {
+        //         bot_account.create_order(model::TradeSide::Buy).await;
+        //         bot_account.update_balances().await;
+        //     }
+        // }
     }
 }

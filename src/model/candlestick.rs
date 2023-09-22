@@ -14,6 +14,7 @@ pub struct Candlestick {
 
 impl Candlestick {
     pub fn new(start_time: DateTime<Utc>) -> Self {
+        // let end_time = start_time + Duration::seconds(30); // Change here
         let end_time = start_time + Duration::minutes(1);
         Candlestick {
             start: start_time,

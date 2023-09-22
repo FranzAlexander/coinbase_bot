@@ -16,8 +16,6 @@ pub enum Event {
     MarketTrades(Vec<MarketTradeEvent>),
     #[serde(rename = "ticker_batch")]
     Ticker(Vec<TickerEvent>),
-    #[serde(rename = "user")]
-    User(Vec<UserEvent>),
 }
 
 #[derive(Deserialize, Debug)]

@@ -19,8 +19,8 @@ pub struct TradingBot {
     pub short_ema: Ema,
     pub long_ema: Ema,
     pub macd: Macd,
-    pub macd_current_signal: TradeSignal,
     pub obv: Obv,
+    pub count: usize,
 }
 
 impl TradingBot {
@@ -35,8 +35,8 @@ impl TradingBot {
             short_ema,
             long_ema,
             macd,
-            macd_current_signal: TradeSignal::Hold,
             obv,
+            count: 0,
         }
     }
 
@@ -46,9 +46,17 @@ impl TradingBot {
         self.macd.update(candle.close);
         self.obv.update(candle.close, candle.volume);
         self.price = candle.close;
+
+        if self.count <= 35 {
+            self.count += 1;
+        }
     }
 
     pub fn get_signal(&self) -> TradeSignal {
+        if self.count <= 35 {
+            return TradeSignal::Hold;
+        }
+
         if let (Some(short_ema), Some(long_ema), Some(macd_line), Some(macd_signal)) = (
             self.short_ema.prev_ema,
             self.long_ema.prev_ema,

@@ -2,14 +2,14 @@ use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::Value;
 use sha2::Sha256;
-use tracing::{event, Level};
+use tracing::{event, info, Level};
 use uuid::Uuid;
 
 use crate::{
     model::{
         account::{AccountList, ActiveTrade, Balance, Product},
         order::OrderResponse,
-        OrderStatus,
+        OrderStatus, TradeSide,
     },
     util::{http_sign, send_get_request},
 };
@@ -29,7 +29,7 @@ pub struct BotAccount {
     balances: Vec<Balance>,
     api_key: String,
     secret_key: String,
-    pub active_trade: Option<ActiveTrade>,
+    pub active_trade: ActiveTrade,
 }
 
 impl BotAccount {
@@ -40,12 +40,14 @@ impl BotAccount {
 
         let client = reqwest::Client::new();
 
+        let active_trade = ActiveTrade::new();
+
         BotAccount {
             client,
             balances: Vec::new(),
             api_key,
             secret_key,
-            active_trade: None,
+            active_trade,
         }
     }
 
@@ -87,17 +89,24 @@ impl BotAccount {
             .expect("Failed to send get request!")
     }
 
-    pub async fn create_buy_order(&mut self) {
-        let client_order_id = Uuid::new_v4().to_string();
+    pub async fn create_order(&mut self, order_type: TradeSide) {
+        let price = self.get_product().await;
 
-        let amount = self.get_balance_value_by_currency(COIN_CURRENCY);
+        let (client_order_id, currency) = match order_type {
+            TradeSide::Buy => (Uuid::new_v4().to_string(), COIN_CURRENCY),
+            TradeSide::Sell => (self.active_trade.order_id.to_string(), COIN_SYMBOL),
+        };
 
-        let rounded_base_amount = format!("{:.2}", amount);
+        let amount = self.get_balance_value_by_currency(currency);
+        let rounded_base_amount = match order_type {
+            TradeSide::Buy => format!("{:.2}", (amount * 100.0).floor() / 100.0),
+            TradeSide::Sell => format!("{:.6}", (amount * 100.0).floor() / 100.0),
+        };
 
         let body = serde_json::json!({
                 "client_order_id": client_order_id,
                 "product_id":"XRP-USDC",
-                "side": "BUY",
+                "side": order_type,
                 "order_configuration":{
                    "market_market_ioc":{
                     "quote_size": rounded_base_amount
@@ -126,73 +135,40 @@ impl BotAccount {
 
         match order {
             Ok(response) => {
-                let order_response = response.json::<Value>().await;
+                let json_resposne = response
+                    .json::<Value>()
+                    .await
+                    .expect("Failed to parse json!");
+
+                let order_response = serde_json::from_value::<OrderResponse>(json_resposne);
 
                 match order_response {
                     Ok(order) => {
-                        let response: OrderResponse =
-                            serde_json::from_value(order).expect("Failed to convert json");
-                        if response.success {
-                            event!(Level::INFO, "Successfuly brought: {}", COIN_SYMBOL);
+                        if order.success {
+                            if order_type == TradeSide::Sell {
+                                self.active_trade.active = false;
+                            }
+                            if order_type == TradeSide::Buy {
+                                if let Some(success_response) = order.success_response {
+                                    self.active_trade.set(
+                                        success_response.order_id,
+                                        success_response.client_order_id,
+                                        price.price,
+                                        price.price * rounded_base_amount.parse::<f64>().unwrap(),
+                                        price.price * (1.0 - STOP_LOSS_PERCENTAGE),
+                                    );
+                                }
+
+                                info!("Buy Response: {:#?}", self.active_trade);
+                            }
+                            event!(Level::INFO, "Successfully {}: {}", order_type, COIN_SYMBOL);
                         }
                     }
                     Err(e) => println!("Error: {:?}", e),
                 }
             }
             Err(e) => {
-                event!(Level::ERROR, "Sending Order: {:?}", e)
-            }
-        }
-    }
-
-    pub async fn create_sell_order(&mut self) {
-        let client_order_id = self.active_trade.as_ref().unwrap().client_order_id;
-
-        let base_amount = self.get_balance_value_by_currency(COIN_SYMBOL); // Amount you want to sell
-        let rounded_base_amount = format!("{:.6}", base_amount);
-
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
-
-        let body = serde_json::json!({
-                "client_order_id": client_order_id,
-                "product_id":"XRP-USDC",
-                "side": "SELL",
-                "order_configuration":{
-                   "market_market_ioc":{
-                    "quote_size": rounded_base_amount
-                   }
-        }});
-
-        let signature = http_sign(
-            self.secret_key.as_bytes(),
-            &timestamp,
-            "POST",
-            "/api/v3/brokerage/orders",
-            &body.to_string(),
-        );
-
-        let headers = self.create_headers(&timestamp, &signature);
-
-        let order = self
-            .client
-            .post(ORDER_API_URL)
-            .headers(headers)
-            .json(&body)
-            .send()
-            .await;
-
-        match order {
-            Ok(response) => {
-                let order_response: OrderResponse = response.json().await.unwrap();
-
-                if order_response.success {
-                    self.active_trade = None;
-
-                    event!(Level::INFO, "Successfuly Sold: {}", COIN_SYMBOL);
-                }
-            }
-            Err(e) => {
-                event!(Level::ERROR, "Sending Sell Order: {:?}", e)
+                event!(Level::ERROR, "Sending {} Order: {:?}", order_type, e);
             }
         }
     }
@@ -232,12 +208,6 @@ impl BotAccount {
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         headers
-    }
-
-    pub fn update_active_trade_status(&mut self, status: OrderStatus) {
-        if self.active_trade.is_some() {
-            self.active_trade.as_mut().unwrap().status = status
-        }
     }
 
     fn get_balance_value_by_currency(&self, currency: &str) -> f64 {
