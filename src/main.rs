@@ -234,7 +234,7 @@ async fn bot_account_run(
                         let price = event.price;
                         if bot_account.active_trade.active &&  price < bot_account.active_trade.stop_loss{
 
-                                bot_account.create_order(model::TradeSide::Sell).await;
+                                bot_account.create_sell_order().await;
 
                         }
 
@@ -243,12 +243,12 @@ async fn bot_account_run(
             }
             Some(signal) = signal_rx.recv() => {
                 if signal == TradeSignal::Sell && bot_account.active_trade.active == true{
-                    bot_account.create_order(model::TradeSide::Sell).await;
+                    bot_account.create_buy_order().await;
                     bot_account.update_balances().await;
                 }
 
                 if signal == TradeSignal::Buy && bot_account.active_trade.active == false{
-                    bot_account.create_order(model::TradeSide::Buy).await;
+                    bot_account.create_sell_order().await;
                     bot_account.update_balances().await;
                 }
             }
