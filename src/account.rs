@@ -3,12 +3,13 @@ use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::Value;
 use sha2::Sha256;
 use tracing::{event, info, Level};
+use tracing_subscriber::fmt::format;
 use uuid::Uuid;
 
 use crate::{
     model::{
         account::{AccountList, ActiveTrade, Balance, Product},
-        order::OrderResponse,
+        order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
         OrderStatus, TradeSide,
     },
     util::{http_sign, send_get_request},
@@ -17,8 +18,9 @@ use crate::{
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
+const HISTORICAL_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders/historical";
 
-const STOP_LOSS_PERCENTAGE: f64 = 0.0002;
+const STOP_LOSS_PERCENTAGE: f64 = 0.005;
 const BALANCE_CURRENCY: &str = "USD";
 const COIN_CURRENCY: &str = "USDC";
 const COIN_SYMBOL: &str = "XRP";
@@ -40,7 +42,7 @@ impl BotAccount {
 
         let client = reqwest::Client::new();
 
-        let active_trade = ActiveTrade::new();
+        let active_trade = ActiveTrade::new(false, "".to_string(), "".to_string(), 0.0, 0.0, 0.0);
 
         BotAccount {
             client,
@@ -151,7 +153,8 @@ impl BotAccount {
                             if order_type == TradeSide::Buy {
                                 if let Some(success_response) = order.success_response {
                                     println!("{:?}", success_response);
-                                    self.active_trade.set(
+                                    self.active_trade = ActiveTrade::new(
+                                        true,
                                         success_response.order_id,
                                         success_response.client_order_id,
                                         price.price,
@@ -178,7 +181,7 @@ impl BotAccount {
         let client_order_id = Uuid::new_v4().to_string();
 
         let amount = self.get_balance_value_by_currency(COIN_CURRENCY);
-        let rounded_base_amount = format!("{:.2}", (2.0_f64 * 100.0).floor() / 100.0);
+        let rounded_base_amount = format!("{:.2}", (1.0_f64 * 100.0).floor() / 100.0);
 
         let request_body =
             self.create_order_body(client_order_id, TradeSide::Buy, rounded_base_amount);
@@ -206,6 +209,62 @@ impl BotAccount {
             .json()
             .await
             .expect("Failed to parse order response!");
+
+        if order.success {
+            if let Some(success_response) = order.success_response {
+                if let Some(current_order) = self.get_order(success_response.order_id).await {
+                    self.active_trade = ActiveTrade::new(
+                        true,
+                        current_order.order_id,
+                        current_order.client_order_id,
+                        current_order.average_filled_price,
+                        current_order.filled_size,
+                        current_order.average_filled_price * (1.0 - STOP_LOSS_PERCENTAGE),
+                    )
+                }
+            }
+        }
+    }
+
+    pub async fn create_sell_order(&mut self) {
+        let client_order_id = Uuid::new_v4().to_string();
+
+        let amount = self.get_balance_value_by_currency(COIN_SYMBOL);
+        let rounded_base_amount = format!("{:.6}", (amount * 100.0).floor() / 100.0);
+
+        let request_body =
+            self.create_order_body(client_order_id, TradeSide::Sell, rounded_base_amount);
+
+        let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+        let signature = http_sign(
+            self.secret_key.as_bytes(),
+            &timestamp,
+            "POST",
+            "/api/v3/brokerage/orders",
+            &request_body.to_string(),
+        );
+
+        let headers = self.create_headers(&timestamp, &signature);
+
+        let order: OrderResponse = self
+            .client
+            .post(ORDER_API_URL)
+            .headers(headers)
+            .json(&request_body)
+            .send()
+            .await
+            .expect("Failed to send order!")
+            .json()
+            .await
+            .expect("Failed to parse order response!");
+
+        println!("SELL ORDER:{:?}", order);
+
+        if order.success {
+            self.active_trade =
+                ActiveTrade::new(false, "".to_string(), "".to_string(), 0.0, 0.0, 0.0);
+        }
     }
 
     pub fn create_order_body(
@@ -214,16 +273,51 @@ impl BotAccount {
         side: TradeSide,
         rounded_base_amount: String,
     ) -> Value {
-        serde_json::json!({
-            "client_order_id":client_order_id,
-            "product_id":"XRP-USDC",
-            "side":side,
-            "order_configuration":{
-                "market_market_ioc":{
-                    "quote_size":  rounded_base_amount
+        if side == TradeSide::Buy {
+            serde_json::json!({
+                "client_order_id":client_order_id,
+                "product_id":"XRP-USDC",
+                "side":side,
+                "order_configuration":{
+                    "market_market_ioc":{
+                        "quote_size":  rounded_base_amount
+                    }
                 }
+            })
+        } else {
+            serde_json::json!({
+                "client_order_id":client_order_id,
+                "product_id":"XRP-USDC",
+                "side":side,
+                "order_configuration":{
+                    "market_market_ioc":{
+                        "base_size":  rounded_base_amount
+                    }
+                }
+            })
+        }
+    }
+
+    pub async fn get_order(&self, order_id: String) -> Option<CurrentOrder> {
+        let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+        let path = format!("{}/{}", "/api/v3/brokerage/orders/historical", order_id);
+
+        let signature = http_sign(self.secret_key.as_bytes(), &timestamp, "GET", &path, "");
+
+        let headers = self.create_headers(&timestamp, &signature);
+
+        let url = format!("{}/{}", HISTORICAL_API_URL, order_id);
+
+        let value = send_get_request::<CurrentOrderResponse>(&self.client, &url, headers).await;
+
+        match value {
+            Ok(v) => Some(v.order),
+            Err(e) => {
+                println!("ORDER VALUE Error: {}", e);
+                None
             }
-        })
+        }
     }
 
     pub async fn get_product(&self) -> Product {

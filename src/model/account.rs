@@ -61,19 +61,8 @@ pub struct ActiveTrade {
 }
 
 impl ActiveTrade {
-    pub fn new() -> Self {
-        ActiveTrade {
-            active: false,
-            order_id: "".to_string(),
-            client_order_id: "".to_string(),
-            price: 0.0,
-            amount: 0.0,
-            stop_loss: 0.0,
-        }
-    }
-
-    pub fn set(
-        &mut self,
+    pub fn new(
+        active: bool,
         order_id: String,
         client_order_id: String,
         price: f64,
@@ -81,7 +70,7 @@ impl ActiveTrade {
         stop_loss: f64,
     ) -> Self {
         ActiveTrade {
-            active: true,
+            active,
             order_id,
             client_order_id,
             price,
