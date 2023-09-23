@@ -18,7 +18,7 @@ const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/account
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
 
-const STOP_LOSS_PERCENTAGE: f64 = 0.002;
+const STOP_LOSS_PERCENTAGE: f64 = 0.0002;
 const BALANCE_CURRENCY: &str = "USD";
 const COIN_CURRENCY: &str = "USDC";
 const COIN_SYMBOL: &str = "XRP";
@@ -65,8 +65,6 @@ impl BotAccount {
                 self.balances.push(account.available_balance.clone());
             }
         }
-
-        println!("{:?}", self.balances);
     }
 
     async fn get_wallet(&self) -> AccountList {
@@ -92,14 +90,16 @@ impl BotAccount {
     pub async fn create_order(&mut self, order_type: TradeSide) {
         let price = self.get_product().await;
 
+        println!("TRADE: {:?}", self.active_trade);
+
         let (client_order_id, currency) = match order_type {
             TradeSide::Buy => (Uuid::new_v4().to_string(), COIN_CURRENCY),
-            TradeSide::Sell => (self.active_trade.order_id.to_string(), COIN_SYMBOL),
+            TradeSide::Sell => (self.active_trade.order_id.to_owned(), COIN_SYMBOL),
         };
 
         let amount = self.get_balance_value_by_currency(currency);
         let rounded_base_amount = match order_type {
-            TradeSide::Buy => format!("{:.2}", (amount * 100.0).floor() / 100.0),
+            TradeSide::Buy => format!("{:.2}", (2.25_f64 * 100.0).floor() / 100.0),
             TradeSide::Sell => format!("{:.6}", (amount * 100.0).floor() / 100.0),
         };
 
@@ -150,6 +150,7 @@ impl BotAccount {
                             }
                             if order_type == TradeSide::Buy {
                                 if let Some(success_response) = order.success_response {
+                                    println!("{:?}", success_response);
                                     self.active_trade.set(
                                         success_response.order_id,
                                         success_response.client_order_id,
@@ -159,7 +160,7 @@ impl BotAccount {
                                     );
                                 }
 
-                                info!("Buy Response: {:#?}", self.active_trade);
+                                info!("Buy Response: {:?}", self.active_trade);
                             }
                             event!(Level::INFO, "Successfully {}: {}", order_type, COIN_SYMBOL);
                         }
@@ -171,6 +172,58 @@ impl BotAccount {
                 event!(Level::ERROR, "Sending {} Order: {:?}", order_type, e);
             }
         }
+    }
+
+    pub async fn create_buy_order(&mut self) {
+        let client_order_id = Uuid::new_v4().to_string();
+
+        let amount = self.get_balance_value_by_currency(COIN_CURRENCY);
+        let rounded_base_amount = format!("{:.2}", (2.0_f64 * 100.0).floor() / 100.0);
+
+        let request_body =
+            self.create_order_body(client_order_id, TradeSide::Buy, rounded_base_amount);
+
+        let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+        let signature = http_sign(
+            self.secret_key.as_bytes(),
+            &timestamp,
+            "POST",
+            "/api/v3/brokerage/orders",
+            &request_body.to_string(),
+        );
+
+        let headers = self.create_headers(&timestamp, &signature);
+
+        let order: OrderResponse = self
+            .client
+            .post(ORDER_API_URL)
+            .headers(headers)
+            .json(&request_body)
+            .send()
+            .await
+            .expect("Failed to send order!")
+            .json()
+            .await
+            .expect("Failed to parse order response!");
+    }
+
+    pub fn create_order_body(
+        &self,
+        client_order_id: String,
+        side: TradeSide,
+        rounded_base_amount: String,
+    ) -> Value {
+        serde_json::json!({
+            "client_order_id":client_order_id,
+            "product_id":"XRP-USDC",
+            "side":side,
+            "order_configuration":{
+                "market_market_ioc":{
+                    "quote_size":  rounded_base_amount
+                }
+            }
+        })
     }
 
     pub async fn get_product(&self) -> Product {

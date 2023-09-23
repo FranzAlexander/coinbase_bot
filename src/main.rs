@@ -234,6 +234,8 @@ async fn bot_account_run(
 ) {
     let mut bot_account = BotAccount::new();
     bot_account.update_balances().await;
+    bot_account.create_order(model::TradeSide::Buy).await;
+    bot_account.create_order(model::TradeSide::Sell).await;
 
     while keep_running.load(Ordering::Relaxed) {
         tokio::select! {
@@ -246,11 +248,7 @@ async fn bot_account_run(
                                 bot_account.create_order(model::TradeSide::Sell).await;
 
                         }
-                        // if let Some(active_trade) = &bot_account.active_trade {
-                        //     if price <= active_trade.stop_loss {
-                        //         bot_account.create_order(model::TradeSide::Sell).await;
-                        //     }
-                        // }
+
                     }
                 }
             }
@@ -266,30 +264,5 @@ async fn bot_account_run(
                 }
             }
         }
-
-        // if let Some(ticker_event) = ticker_rx.recv().await {
-        //     for ticker_event in ticker_event.iter() {
-        //         for event in &ticker_event.tickers {
-        //             let price = event.price;
-        //             if let Some(active_trade) = &bot_account.active_trade {
-        //                 if price <= active_trade.stop_loss {
-        //                     bot_account.create_order(model::TradeSide::Sell).await;
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-
-        // if let Some(signal) = signal_rx.recv().await {
-        //     if signal == TradeSignal::Sell && bot_account.active_trade.is_some() {
-        //         bot_account.create_order(model::TradeSide::Sell).await;
-        //         bot_account.update_balances().await;
-        //     }
-
-        //     if signal == TradeSignal::Buy && bot_account.active_trade.is_none() {
-        //         bot_account.create_order(model::TradeSide::Buy).await;
-        //         bot_account.update_balances().await;
-        //     }
-        // }
     }
 }

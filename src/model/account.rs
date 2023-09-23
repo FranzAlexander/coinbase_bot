@@ -53,8 +53,8 @@ pub struct Product {
 #[derive(Debug)]
 pub struct ActiveTrade {
     pub active: bool,
-    pub order_id: Uuid,
-    pub client_order_id: Uuid,
+    pub order_id: String,
+    pub client_order_id: String,
     pub price: f64,
     pub amount: f64,
     pub stop_loss: f64,
@@ -64,8 +64,8 @@ impl ActiveTrade {
     pub fn new() -> Self {
         ActiveTrade {
             active: false,
-            order_id: Uuid::default(),
-            client_order_id: Uuid::default(),
+            order_id: "".to_string(),
+            client_order_id: "".to_string(),
             price: 0.0,
             amount: 0.0,
             stop_loss: 0.0,
@@ -74,17 +74,19 @@ impl ActiveTrade {
 
     pub fn set(
         &mut self,
-        order_id: Uuid,
-        client_order_id: Uuid,
+        order_id: String,
+        client_order_id: String,
         price: f64,
-        amout: f64,
+        amount: f64,
         stop_loss: f64,
-    ) {
-        self.active = true;
-        self.order_id = order_id;
-        self.client_order_id = client_order_id;
-        self.price = price;
-        self.amount = amout;
-        self.stop_loss = stop_loss;
+    ) -> Self {
+        ActiveTrade {
+            active: true,
+            order_id,
+            client_order_id,
+            price,
+            amount,
+            stop_loss,
+        }
     }
 }

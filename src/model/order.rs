@@ -17,18 +17,18 @@ pub struct OrderConfiguration {
 pub struct OrderResponse {
     pub success: bool,
     pub failure_reason: String,
-    pub order_id: Uuid,
+    pub order_id: String,
     pub success_response: Option<SuccessResponse>,
     pub error_response: Option<ErrorResponse>,
     pub order_configuration: OrderConfiguration,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SuccessResponse {
-    pub order_id: Uuid,
+    pub order_id: String,
     pub product_id: String,
     pub side: String,
-    pub client_order_id: Uuid,
+    pub client_order_id: String,
 }
 
 #[derive(Deserialize)]
