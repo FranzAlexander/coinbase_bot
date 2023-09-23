@@ -79,16 +79,7 @@ pub(crate) mod string_or_float {
 }
 
 pub(crate) mod string_or_i64 {
-    use serde::{de, Deserialize, Deserializer, Serializer};
-    use std::fmt;
-
-    pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        T: fmt::Display,
-        S: Serializer,
-    {
-        serializer.collect_str(value)
-    }
+    use serde::{de, Deserialize, Deserializer};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
     where

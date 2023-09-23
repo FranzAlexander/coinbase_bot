@@ -1,6 +1,6 @@
 use futures::SinkExt;
 use hmac::{Hmac, Mac};
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::json;
 use sha2::Sha256;
 use tokio::{net::TcpStream, signal, sync::mpsc, time::Instant};
@@ -75,4 +75,28 @@ pub fn http_sign(
     let result = mac.finalize();
 
     format!("{:x}", result.into_bytes())
+}
+
+pub fn create_headers(
+    secret_key: &[u8],
+    api_key: &str,
+    method: &str,
+    request_path: &str,
+    body: &str,
+) -> HeaderMap {
+    let timestamp = format!("{}", chrono::Utc::now().timestamp());
+
+    let signature = http_sign(secret_key, &timestamp, method, request_path, body);
+
+    let mut headers = HeaderMap::new();
+
+    headers.insert("CB-ACCESS-KEY", HeaderValue::from_str(api_key).unwrap());
+    headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(&signature).unwrap());
+    headers.insert(
+        "CB-ACCESS-TIMESTAMP",
+        HeaderValue::from_str(&timestamp).unwrap(),
+    );
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+    headers
 }

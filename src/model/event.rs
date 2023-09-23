@@ -1,3 +1,5 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use uuid::Uuid;
@@ -31,8 +33,18 @@ pub struct SubscriptionEvent {
 
 #[derive(Debug, Deserialize)]
 pub struct HeartbeatEvent {
-    current_time: String, // or use chrono::NaiveDateTime
+    current_time: DateTime<Utc>,
     heartbeat_counter: u64,
+}
+
+impl fmt::Display for HeartbeatEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Current Time: {}, Heartbeat Counter: {}",
+            self.current_time, self.heartbeat_counter
+        )
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

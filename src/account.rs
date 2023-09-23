@@ -12,13 +12,15 @@ use crate::{
         order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
         OrderStatus, TradeSide,
     },
-    util::{http_sign, send_get_request},
+    util::{create_headers, http_sign, send_get_request},
 };
 
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
 const HISTORICAL_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders/historical";
+
+const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
 
 const STOP_LOSS_PERCENTAGE: f64 = 0.005;
 const BALANCE_CURRENCY: &str = "USD";
@@ -32,6 +34,7 @@ pub struct BotAccount {
     api_key: String,
     secret_key: String,
     pub active_trade: ActiveTrade,
+    trade_active: bool,
 }
 
 impl BotAccount {
@@ -50,6 +53,7 @@ impl BotAccount {
             api_key,
             secret_key,
             active_trade,
+            trade_active: false,
         }
     }
 
@@ -90,89 +94,67 @@ impl BotAccount {
     }
 
     pub async fn create_order(&mut self, order_type: TradeSide) {
-        let price = self.get_product().await;
+        let client_order_id = Uuid::new_v4().to_string();
 
-        println!("TRADE: {:?}", self.active_trade);
-
-        let (client_order_id, currency) = match order_type {
-            TradeSide::Buy => (Uuid::new_v4().to_string(), COIN_CURRENCY),
-            TradeSide::Sell => (self.active_trade.order_id.to_owned(), COIN_SYMBOL),
+        let currency = if order_type == TradeSide::Buy {
+            COIN_CURRENCY
+        } else {
+            COIN_SYMBOL
         };
 
         let amount = self.get_balance_value_by_currency(currency);
-        let rounded_base_amount = match order_type {
-            TradeSide::Buy => format!("{:.2}", (2.25_f64 * 100.0).floor() / 100.0),
-            TradeSide::Sell => format!("{:.6}", (amount * 100.0).floor() / 100.0),
+        let (quote_size, base_size) = match order_type {
+            TradeSide::Buy => (
+                Some(format!("{:.2}", (amount * 100.0).floor() / 100.0)),
+                None,
+            ),
+            TradeSide::Sell => (
+                None,
+                Some(format!("{:.6}", (amount * 100.0).floor() / 100.0)),
+            ),
         };
 
         let body = serde_json::json!({
-                "client_order_id": client_order_id,
-                "product_id":"XRP-USDC",
-                "side": order_type,
-                "order_configuration":{
-                   "market_market_ioc":{
-                    "quote_size": rounded_base_amount
-                   }
-        }});
+            "client_order_id": client_order_id,
+            "product_id":"XRP-USDC",
+            "side": order_type,
+            "order_configuration":{
+                "market_market_ioc":{
+                    "quote_size":  quote_size,
+                    "base_size": base_size
+                }
+            }
+        })
+        .to_string();
 
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
-
-        let signature = http_sign(
+        let headers = create_headers(
             self.secret_key.as_bytes(),
-            &timestamp,
+            &self.api_key,
             "POST",
-            "/api/v3/brokerage/orders",
-            &body.to_string(),
+            ORDER_REQUEST_PATH,
+            &body,
         );
 
-        let headers = self.create_headers(&timestamp, &signature);
-
-        let order = self
+        let order: OrderResponse = self
             .client
             .post(ORDER_API_URL)
             .headers(headers)
             .json(&body)
             .send()
-            .await;
+            .await
+            .expect("Failed to send order")
+            .json()
+            .await
+            .expect("Failed to read json");
 
-        match order {
-            Ok(response) => {
-                let json_resposne = response
-                    .json::<Value>()
-                    .await
-                    .expect("Failed to parse json!");
-
-                let order_response = serde_json::from_value::<OrderResponse>(json_resposne);
-
-                match order_response {
-                    Ok(order) => {
-                        if order.success {
-                            if order_type == TradeSide::Sell {
-                                self.active_trade.active = false;
-                            }
-                            if order_type == TradeSide::Buy {
-                                if let Some(success_response) = order.success_response {
-                                    println!("{:?}", success_response);
-                                    self.active_trade = ActiveTrade::new(
-                                        true,
-                                        success_response.order_id,
-                                        success_response.client_order_id,
-                                        price.price,
-                                        price.price * rounded_base_amount.parse::<f64>().unwrap(),
-                                        price.price * (1.0 - STOP_LOSS_PERCENTAGE),
-                                    );
-                                }
-
-                                info!("Buy Response: {:?}", self.active_trade);
-                            }
-                            event!(Level::INFO, "Successfully {}: {}", order_type, COIN_SYMBOL);
-                        }
-                    }
-                    Err(e) => println!("Error: {:?}", e),
+        if order.success {
+            match order_type {
+                TradeSide::Buy => {
+                    self.trade_active = true;
                 }
-            }
-            Err(e) => {
-                event!(Level::ERROR, "Sending {} Order: {:?}", order_type, e);
+                TradeSide::Sell => {
+                    self.trade_active = false;
+                }
             }
         }
     }
@@ -363,5 +345,9 @@ impl BotAccount {
             .find(|x| x.currency == currency)
             .expect("Failed to find currency")
             .value
+    }
+
+    pub fn is_trade_active(&self) -> bool {
+        self.trade_active
     }
 }
