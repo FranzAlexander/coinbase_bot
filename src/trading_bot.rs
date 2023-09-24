@@ -1,7 +1,3 @@
-use std::{sync::Arc, thread};
-
-use tokio::sync::{mpsc, Mutex};
-
 use crate::{
     indicators::{ema::Ema, macd::Macd, obv::Obv},
     model::candlestick::Candlestick,
@@ -14,6 +10,8 @@ pub enum TradeSignal {
     Hold,
 }
 
+const MAX_MACD_SIGNAL_PERIOD: usize = 10;
+
 pub struct TradingBot {
     pub price: f64,
     pub short_ema: Ema,
@@ -21,6 +19,8 @@ pub struct TradingBot {
     pub macd: Macd,
     pub obv: Obv,
     pub count: usize,
+    pub macd_count: usize,
+    pub current_macd_signal: TradeSignal,
 }
 
 impl TradingBot {
@@ -37,6 +37,8 @@ impl TradingBot {
             macd,
             obv,
             count: 0,
+            macd_count: 0,
+            current_macd_signal: TradeSignal::Hold,
         }
     }
 
@@ -52,28 +54,49 @@ impl TradingBot {
         }
     }
 
-    pub fn get_signal(&self) -> TradeSignal {
+    pub fn get_signal(&mut self) -> TradeSignal {
         if self.count <= 35 {
             return TradeSignal::Hold;
         }
 
-        if let (Some(short_ema), Some(long_ema), Some(macd_line), Some(macd_signal)) = (
-            self.short_ema.prev_ema,
-            self.long_ema.prev_ema,
-            self.macd.prev_ema,
-            self.macd.get_signal(),
-        ) {
-            if short_ema > long_ema && macd_line > macd_signal {
-                return TradeSignal::Buy;
-            }
+        let (macd_line, macd_signal) = match (self.macd.prev_ema, self.macd.get_signal()) {
+            (Some(macd_line), Some(macd_signal)) => (macd_line, macd_signal),
+            _ => return TradeSignal::Hold,
+        };
 
-            if short_ema < long_ema && macd_line < macd_signal {
-                return TradeSignal::Sell;
-            }
+        self.update_macd_signal_and_count(macd_line, macd_signal);
 
-            TradeSignal::Hold
+        // Return Hold if macd_count is 10 or more, irrespective of EMA conditions.
+        if self.macd_count >= MAX_MACD_SIGNAL_PERIOD {
+            return TradeSignal::Hold;
+        }
+
+        match (self.short_ema.prev_ema, self.long_ema.prev_ema) {
+            (Some(short_ema), Some(long_ema)) => {
+                if short_ema > long_ema && self.current_macd_signal == TradeSignal::Buy {
+                    TradeSignal::Buy
+                } else if short_ema < long_ema && self.current_macd_signal == TradeSignal::Sell {
+                    TradeSignal::Sell
+                } else {
+                    TradeSignal::Hold
+                }
+            }
+            _ => TradeSignal::Hold,
+        }
+    }
+
+    fn update_macd_signal_and_count(&mut self, macd_line: f64, macd_signal: f64) {
+        if macd_line > macd_signal && self.current_macd_signal == TradeSignal::Buy
+            || macd_line < macd_signal && self.current_macd_signal == TradeSignal::Sell
+        {
+            self.macd_count += 1;
         } else {
-            TradeSignal::Hold
+            self.macd_count = 1;
+            self.current_macd_signal = if macd_line > macd_signal {
+                TradeSignal::Buy
+            } else {
+                TradeSignal::Sell
+            };
         }
     }
 }

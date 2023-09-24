@@ -16,8 +16,6 @@ pub enum Event {
     Heartbeats(Vec<HeartbeatEvent>),
     #[serde(rename = "market_trades")]
     MarketTrades(Vec<MarketTradeEvent>),
-    #[serde(rename = "ticker_batch")]
-    Ticker(Vec<TickerEvent>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -65,34 +63,6 @@ pub struct MarketTrade {
     pub size: f64,
     side: TradeSide,
     pub time: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct TickerEvent {
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub tickers: Vec<Ticker>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Ticker {
-    #[serde(rename = "type")]
-    ticker_type: String,
-    product_id: String,
-    #[serde(with = "string_or_float")]
-    pub price: f64,
-    #[serde(with = "string_or_float")]
-    volume_24_h: f64,
-    #[serde(with = "string_or_float")]
-    low_24_h: f64,
-    #[serde(with = "string_or_float")]
-    high_24_h: f64,
-    #[serde(with = "string_or_float")]
-    low_52_w: f64,
-    #[serde(with = "string_or_float")]
-    high_52_w: f64,
-    #[serde(with = "string_or_float")]
-    price_percent_chg_24_h: f64,
 }
 
 #[derive(Debug, Deserialize, Clone)]

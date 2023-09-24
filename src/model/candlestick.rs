@@ -1,3 +1,5 @@
+use std::fmt;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 
@@ -32,5 +34,21 @@ impl Candlestick {
         self.low = Some(self.low.map_or(close, |l| l.min(close)));
         self.volume += volume;
         self.close = close;
+    }
+}
+
+impl fmt::Display for Candlestick {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Start: {}, End: {}, Open: {}, High: {}, Low: {}, Close: {}, Volume: {}",
+            self.start,
+            self.end,
+            self.open.unwrap_or(0.0),
+            self.high,
+            self.low.unwrap_or(0.0),
+            self.close,
+            self.volume
+        )
     }
 }

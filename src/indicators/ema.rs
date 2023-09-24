@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub struct Ema {
     period: usize,
@@ -42,5 +44,11 @@ impl Ema {
 
     pub fn get_ema(&self) -> Option<f64> {
         self.prev_ema
+    }
+}
+
+impl fmt::Display for Ema {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Ema: {}", self.prev_ema.unwrap_or(0.0))
     }
 }
