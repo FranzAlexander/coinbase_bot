@@ -108,7 +108,6 @@ async fn run(
                     match msg {
                         Ok(event_msg) => match event_msg {
                             Message::Text(text) => {
-                                println!("{}", text);
                                 let event: Event = serde_json::from_str(&text).unwrap();
 
                                 match event {
