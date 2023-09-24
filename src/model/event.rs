@@ -31,7 +31,7 @@ pub struct SubscriptionEvent {
 
 #[derive(Debug, Deserialize)]
 pub struct HeartbeatEvent {
-    current_time: DateTime<Utc>,
+    current_time: String,
     heartbeat_counter: u64,
 }
 
