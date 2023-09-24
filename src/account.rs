@@ -56,6 +56,8 @@ impl BotAccount {
     pub async fn update_balances(&mut self) {
         let accounts = self.get_wallet().await;
 
+        println!("{:?}", accounts);
+
         for account in accounts.accounts.into_iter() {
             if let Some(pos) = self
                 .balances
@@ -104,10 +106,7 @@ impl BotAccount {
                 Some(format!("{:.2}", (amount * 100.0).floor() / 100.0)),
                 None,
             ),
-            TradeSide::Sell => (
-                None,
-                Some(format!("{:.6}", (amount * 100.0).floor() / 100.0)),
-            ),
+            TradeSide::Sell => (None, Some(format!("{:.6}", amount))),
         };
 
         let body = serde_json::json!({
