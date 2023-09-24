@@ -117,18 +117,17 @@ impl BotAccount {
             "order_configuration":{
                 "market_market_ioc":{
                     "quote_size":  quote_size,
-                    "base_size": base_size
+                    "base_size":  base_size
                 }
             }
-        })
-        .to_string();
+        });
 
         let headers = create_headers(
             self.secret_key.as_bytes(),
             &self.api_key,
             "POST",
             ORDER_REQUEST_PATH,
-            &body,
+            &body.to_string(),
         );
 
         let order: OrderResponse = self
