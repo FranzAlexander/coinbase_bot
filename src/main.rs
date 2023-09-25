@@ -202,9 +202,18 @@ fn candle(
     }
 }
 
+// #[inline]
+// fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
+//     end_time.with_second(0).expect("Failed to set seconds to 0")
+// }
+
 #[inline]
 fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
-    end_time.with_second(0).expect("Failed to set seconds to 0")
+    let seconds = end_time.second();
+    let rounded_seconds = if seconds >= 30 { 30 } else { 0 };
+    end_time
+        .with_second(rounded_seconds)
+        .expect("Failed to set seconds")
 }
 
 fn trading_bot_run(
