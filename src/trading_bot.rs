@@ -71,11 +71,19 @@ impl TradingBot {
             return TradeSignal::Hold;
         }
 
+        let obv_trend = self.obv.get_trend();
+
         match (self.short_ema.prev_ema, self.long_ema.prev_ema) {
             (Some(short_ema), Some(long_ema)) => {
-                if short_ema > long_ema && self.current_macd_signal == TradeSignal::Buy {
+                if short_ema > long_ema
+                    && self.current_macd_signal == TradeSignal::Buy
+                    && obv_trend == TradeSignal::Buy
+                {
                     TradeSignal::Buy
-                } else if short_ema < long_ema && self.current_macd_signal == TradeSignal::Sell {
+                } else if short_ema < long_ema
+                    && self.current_macd_signal == TradeSignal::Sell
+                    && obv_trend == TradeSignal::Sell
+                {
                     TradeSignal::Sell
                 } else {
                     TradeSignal::Hold

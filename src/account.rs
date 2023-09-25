@@ -25,7 +25,7 @@ const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
 const STOP_LOSS_PERCENTAGE: f64 = 0.005;
 const BALANCE_CURRENCY: &str = "USD";
 const COIN_CURRENCY: &str = "USDC";
-const COIN_SYMBOL: &str = "XRP";
+const COIN_SYMBOL: &str = "BTC";
 
 #[derive(Debug)]
 pub struct BotAccount {
@@ -111,7 +111,7 @@ impl BotAccount {
 
         let body = serde_json::json!({
             "client_order_id": client_order_id,
-            "product_id":"XRP-USDC",
+            "product_id":"BTC-USDC",
             "side": order_type,
             "order_configuration":{
                 "market_market_ioc":{
@@ -182,7 +182,7 @@ impl BotAccount {
             self.secret_key.as_bytes(),
             &timestamp,
             "GET",
-            "/api/v3/brokerage/products/XRP-USD",
+            "/api/v3/brokerage/products/BTC-USD",
             "",
         );
 
