@@ -103,7 +103,7 @@ async fn run(
             Ok((mut ws_stream, _)) => {
                 info!("Connected to server!");
 
-                subscribe(&mut ws_stream, "XRP-USD", "subscribe").await;
+                subscribe(&mut ws_stream, "BTC-USD", "subscribe").await;
                 while let Some(msg) = ws_stream.next().await {
                     match msg {
                         Ok(event_msg) => match event_msg {

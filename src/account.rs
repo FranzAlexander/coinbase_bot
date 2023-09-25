@@ -1,16 +1,12 @@
-use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
-use serde_json::Value;
-use sha2::Sha256;
-use tracing::{event, info, Level};
-use tracing_subscriber::fmt::format;
+
 use uuid::Uuid;
 
 use crate::{
     model::{
-        account::{AccountList, ActiveTrade, Balance, Product},
+        account::{AccountList, Balance, Product},
         order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
-        OrderStatus, TradeSide,
+        TradeSide,
     },
     util::{create_headers, http_sign, send_get_request},
 };
