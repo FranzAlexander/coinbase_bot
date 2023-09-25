@@ -102,7 +102,7 @@ impl BotAccount {
                 Some(format!("{:.2}", (amount * 100.0).floor() / 100.0)),
                 None,
             ),
-            TradeSide::Sell => (None, Some(format!("{:.6}", amount))),
+            TradeSide::Sell => (None, Some(format!("{:.8}", amount))),
         };
 
         let body = serde_json::json!({
