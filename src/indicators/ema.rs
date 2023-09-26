@@ -4,7 +4,7 @@ use std::fmt;
 pub struct Ema {
     period: usize,
     multiplier: f64,
-    pub prev_ema: Option<f64>,
+    prev_ema: Option<f64>,
     accumulated_sum: f64,
     count: usize,
 }
@@ -42,6 +42,7 @@ impl Ema {
         self.prev_ema = Some(ema_value);
     }
 
+    #[inline]
     pub fn get_ema(&self) -> Option<f64> {
         self.prev_ema
     }

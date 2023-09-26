@@ -35,9 +35,9 @@ impl Obv {
     }
 
     pub fn get_trend(&self) -> TradeSignal {
-        if self.obv > self.obv_ema.prev_ema.unwrap() {
+        if self.obv > self.obv_ema.get_ema().unwrap() {
             TradeSignal::Buy
-        } else if self.obv < self.obv_ema.prev_ema.unwrap() {
+        } else if self.obv < self.obv_ema.get_ema().unwrap() {
             TradeSignal::Sell
         } else {
             TradeSignal::Hold

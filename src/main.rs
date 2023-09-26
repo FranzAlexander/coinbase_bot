@@ -210,7 +210,7 @@ fn candle(
 #[inline]
 fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
     let seconds = end_time.second();
-    let rounded_seconds = if seconds >= 30 { 30 } else { 0 };
+    let rounded_seconds = if seconds >= 50 { 50 } else { 0 };
     end_time
         .with_second(rounded_seconds)
         .expect("Failed to set seconds")
@@ -229,6 +229,7 @@ fn trading_bot_run(
                 let mut locked_bot = trading_bot.blocking_lock();
                 locked_bot.update_bot(candlestick);
                 signal = locked_bot.get_signal();
+                println!("TRADING BOT: {}", locked_bot);
             }
             let _ = signal_tx.blocking_send(signal);
         }
