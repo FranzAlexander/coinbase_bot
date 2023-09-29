@@ -1,44 +1,46 @@
+use std::fmt;
+
 use super::ema::Ema;
 
-#[derive(Debug)]
 pub struct Macd {
-    short_ema: Ema,
-    long_ema: Ema,
-    signal: Ema,
-    pub prev_ema: Option<f64>,
+    fast_ema: Ema,
+    slow_ema: Ema,
+    signal_ema: Ema,
+    macd_value: f64,
+    signal: f64,
 }
 
 impl Macd {
-    pub fn new(short_period: usize, long_period: usize, signal_period: usize) -> Self {
+    pub fn new(fast_length: usize, slow_length: usize, signal_length: usize) -> Self {
         Macd {
-            short_ema: Ema::new(short_period),
-            long_ema: Ema::new(long_period),
-            signal: Ema::new(signal_period),
-            prev_ema: None,
+            fast_ema: Ema::new(fast_length),
+            slow_ema: Ema::new(slow_length),
+            signal_ema: Ema::new(signal_length),
+            macd_value: 0.0,
+            signal: 0.0,
         }
     }
 
     pub fn update(&mut self, price: f64) {
-        self.short_ema.update(price);
-        self.long_ema.update(price);
-
         if let (Some(fast_ema), Some(slow_ema)) =
-            (self.short_ema.get_ema(), self.long_ema.get_ema())
+            (self.fast_ema.update(price), self.slow_ema.update(price))
         {
-            let macd_value = fast_ema - slow_ema;
-            self.prev_ema = Some(macd_value);
-            self.signal.update(macd_value);
+            self.macd_value = fast_ema - slow_ema;
+            self.signal = self.signal_ema.update(self.macd_value).unwrap_or(0.0);
         }
     }
 
-    pub fn get_signal(&self) -> Option<f64> {
-        self.signal.get_ema()
+    pub fn get_macd_line(&self) -> f64 {
+        self.macd_value
     }
 
-    pub fn get_histogram(&self) -> Option<f64> {
-        if let Some(macd_value) = self.prev_ema {
-            return Some(macd_value - self.signal.get_ema().unwrap());
-        }
-        None
+    pub fn get_signal_line(&self) -> f64 {
+        self.signal
+    }
+}
+
+impl fmt::Display for Macd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Value: {}, Signal: {}", self.macd_value, self.signal)
     }
 }

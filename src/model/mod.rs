@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use self::account::Balance;
+
 pub mod account;
 pub mod candlestick;
 pub mod event;

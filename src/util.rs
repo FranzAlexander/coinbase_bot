@@ -37,8 +37,12 @@ pub async fn subscribe(
     }
 }
 
+pub fn market_subcribe_string(coin_symbol: &str, curreny_sybmol: &str) -> String {
+    format!("{}-{}", coin_symbol, curreny_sybmol)
+}
+
 fn sign_message(message: &str) -> String {
-    let api_secret = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
+    let api_secret = std::env::var("API_SECRET").expect("API_SECRET not found in environment");
 
     let mut mac =
         HmacSha256::new_from_slice(api_secret.as_bytes()).expect("HMAC can take key of any size");

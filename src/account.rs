@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 use uuid::Uuid;
 
 use crate::{
+    coin::Coin,
     model::{
         account::{AccountList, Balance, Product},
         order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
@@ -23,9 +26,17 @@ const BALANCE_CURRENCY: &str = "USD";
 const COIN_CURRENCY: &str = "USDC";
 const COIN_SYMBOL: &str = "BTC";
 
+pub const USD_SYMBOL: &str = "USD";
+pub const USDC_SYMBOL: &str = "USDC";
+pub const BTC_SYMBOL: &str = "BTC";
+pub const XRP_SYMBOL: &str = "XRP";
+pub const ETH_SYMBOL: &str = "ETH";
+pub const ADA_SYMBOL: &str = "ADA";
+
 #[derive(Debug)]
 pub struct BotAccount {
     client: reqwest::Client,
+    coins: HashMap<String, Coin>,
     balances: Vec<Balance>,
     api_key: String,
     secret_key: String,
@@ -39,9 +50,11 @@ impl BotAccount {
         let secret_key = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
 
         let client = reqwest::Client::new();
+        let coins = HashMap::new();
 
         BotAccount {
             client,
+            coins,
             balances: Vec::new(),
             api_key,
             secret_key,
@@ -52,17 +65,13 @@ impl BotAccount {
     pub async fn update_balances(&mut self) {
         let accounts = self.get_wallet().await;
 
-        println!("{:?}", accounts);
-
         for account in accounts.accounts.into_iter() {
-            if let Some(pos) = self
-                .balances
-                .iter()
-                .position(|x| x.currency == account.available_balance.currency)
-            {
-                self.balances[pos] = account.available_balance.clone();
-            } else {
-                self.balances.push(account.available_balance.clone());
+            match account.currency.as_str() {
+                USDC_SYMBOL | BTC_SYMBOL | XRP_SYMBOL | ETH_SYMBOL | ADA_SYMBOL => {
+                    self.coins
+                        .insert(account.currency, Coin::new(account.available_balance));
+                }
+                _ => {}
             }
         }
     }
@@ -99,7 +108,7 @@ impl BotAccount {
         let amount = self.get_balance_value_by_currency(currency);
         let (quote_size, base_size) = match order_type {
             TradeSide::Buy => (
-                Some(format!("{:.2}", (amount * 100.0).floor() / 100.0)),
+                Some(format!("{:.2}", (5.0_f64 * 100.0).floor() / 100.0)),
                 None,
             ),
             TradeSide::Sell => (None, Some(format!("{:.8}", amount))),

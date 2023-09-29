@@ -17,14 +17,15 @@ pub enum TradeSignal {
     Hold,
 }
 
+const MACD_FIVE_TIMEFRAME: (usize, usize, usize) = (12, 26, 9);
+
 const MAX_MACD_SIGNAL_PERIOD: usize = 10;
 const MIN_CANDLE_PROCCESSED: usize = 20;
 
 pub struct TradingBot {
     pub price: f64,
-    macd: Macd,     // Uses kline close
-    low_macd: Macd, // Uses kline low
-    pub obv: Obv,
+    macd: Macd, // Uses kline close
+
     pub stoch_rsi: StochRsi,
     pub count: usize,
     pub current_macd_signal: TradeSignal,
@@ -32,16 +33,13 @@ pub struct TradingBot {
 
 impl TradingBot {
     pub fn new() -> Self {
-        let macd = Macd::new(9, 12, 7);
-        let low_macd = Macd::new(9, 12, 7);
-        let obv = Obv::new();
-        let stoch_rsi = StochRsi::new(9, 12, 3, 3);
+        let macd = Macd::new(12, 26, 9);
+
+        let stoch_rsi = StochRsi::new(14, 14, 3, 3);
 
         TradingBot {
             price: 0.0,
             macd,
-            low_macd,
-            obv,
             stoch_rsi,
             count: 0,
             current_macd_signal: TradeSignal::Hold,
@@ -50,8 +48,7 @@ impl TradingBot {
 
     pub fn update_bot(&mut self, candle: Candlestick) {
         self.macd.update(candle.close);
-        self.low_macd.update(candle.low.unwrap_or(0.00001));
-        self.obv.update(candle.close, candle.volume);
+
         self.stoch_rsi.update(candle.close, self.price);
         self.price = candle.close;
 
@@ -65,32 +62,14 @@ impl TradingBot {
             return TradeSignal::Hold;
         }
 
-        let (low_macd_line, low_macd_signal) =
-            match (self.low_macd.prev_ema, self.low_macd.get_signal()) {
-                (Some(macd_line), Some(macd_signal)) => (macd_line, macd_signal),
-                _ => return TradeSignal::Hold,
-            };
-
-        let low_trade_signal = self.get_macd_signal(low_macd_line, low_macd_signal);
-
-        let (macd_line, macd_signal) = match (self.macd.prev_ema, self.macd.get_signal()) {
-            (Some(macd_line), Some(macd_signal)) => (macd_line, macd_signal),
-            _ => return TradeSignal::Hold,
-        };
+        let (macd_line, macd_signal) = (self.macd.get_macd_line(), self.macd.get_signal_line());
 
         let macd_trade_signal = self.get_macd_signal(macd_line, macd_signal);
 
-        let (avg_k, avg_d) = match (self.stoch_rsi.get_avg_k(), self.stoch_rsi.get_avg_d()) {
-            (Some(avg_k), Some(avg_d)) => (avg_k, avg_d),
-            _ => return TradeSignal::Hold,
-        };
+        let avg_k = self.stoch_rsi.k;
+        let avg_d = self.stoch_rsi.d;
 
-        let obv_trend = self.obv.get_trend();
-
-        if macd_trade_signal == TradeSignal::Buy
-            && low_trade_signal == TradeSignal::Buy
-            && avg_k > avg_d
-        {
+        if macd_trade_signal == TradeSignal::Buy && avg_k > avg_d {
             TradeSignal::Buy
         } else if macd_trade_signal == TradeSignal::Sell && avg_k < avg_d {
             TradeSignal::Sell
@@ -110,12 +89,13 @@ impl TradingBot {
 
 impl fmt::Display for TradingBot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Macd Line: {}, Macd Signal: {}, Low Macd Line: {}, Low Macd Signal: {}, avg k: {}, avg d: {}",
-        self.macd.prev_ema.unwrap_or(0.0),
-        self.macd.get_signal().unwrap_or(0.0),
-        self.low_macd.prev_ema.unwrap_or(0.0),
-        self.low_macd.get_signal().unwrap_or(0.0),
-        self.stoch_rsi.get_avg_k().unwrap_or(0.0),
-        self.stoch_rsi.get_avg_d().unwrap_or(0.0))
+        write!(
+            f,
+            "Macd Line: {}, Macd Signal: {},  avg k: {}, avg d: {}",
+            self.macd.get_macd_line(),
+            self.macd.get_signal_line(),
+            self.stoch_rsi.k,
+            self.stoch_rsi.d,
+        )
     }
 }

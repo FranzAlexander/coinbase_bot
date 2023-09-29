@@ -56,7 +56,7 @@ pub struct MarketTradeEvent {
 pub struct MarketTrade {
     #[serde(with = "string_or_i64")]
     trade_id: i64,
-    product_id: String,
+    pub product_id: String,
     #[serde(with = "string_or_float")]
     pub price: f64,
     #[serde(with = "string_or_float")]
