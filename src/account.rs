@@ -1,16 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::SystemTime};
 
+use chrono::{Duration, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::{
     coin::Coin,
     model::{
         account::{AccountList, Balance, Product},
+        event::CandleEvent,
         order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
         TradeSide,
     },
+    trading_bot::TradeSignal,
     util::{create_headers, http_sign, send_get_request},
 };
 
@@ -19,9 +23,9 @@ const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/product
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
 const HISTORICAL_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders/historical";
 
+const ACCOUNT_REQUEST_PATH: &str = "/api/v3/brokerage/accounts";
 const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
 
-const STOP_LOSS_PERCENTAGE: f64 = 0.005;
 const BALANCE_CURRENCY: &str = "USD";
 const COIN_CURRENCY: &str = "USDC";
 const COIN_SYMBOL: &str = "BTC";
@@ -37,7 +41,6 @@ pub const ADA_SYMBOL: &str = "ADA";
 pub struct BotAccount {
     client: reqwest::Client,
     coins: HashMap<String, Coin>,
-    balances: Vec<Balance>,
     api_key: String,
     secret_key: String,
     trade_active: bool,
@@ -55,7 +58,6 @@ impl BotAccount {
         BotAccount {
             client,
             coins,
-            balances: Vec::new(),
             api_key,
             secret_key,
             trade_active: false,
@@ -69,7 +71,7 @@ impl BotAccount {
             match account.currency.as_str() {
                 USDC_SYMBOL | BTC_SYMBOL | XRP_SYMBOL | ETH_SYMBOL | ADA_SYMBOL => {
                     self.coins
-                        .insert(account.currency, Coin::new(account.available_balance));
+                        .insert(account.currency, Coin::new(account.available_balance.value));
                 }
                 _ => {}
             }
@@ -77,35 +79,28 @@ impl BotAccount {
     }
 
     async fn get_wallet(&self) -> AccountList {
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
-
-        // Generate the HMAC signature
-        let signature = http_sign(
+        let headers = create_headers(
             self.secret_key.as_bytes(),
-            &timestamp,
+            &self.api_key,
             "GET",
-            "/api/v3/brokerage/accounts",
+            ACCOUNT_REQUEST_PATH,
             "",
         );
-
-        // Create headers
-        let headers = self.create_headers(timestamp.as_str(), signature.as_str());
 
         send_get_request::<AccountList>(&self.client, ACCOUNT_API_URL, headers)
             .await
             .expect("Failed to send get request!")
     }
 
-    pub async fn create_order(&mut self, order_type: TradeSide) {
+    pub async fn create_order(&mut self, order_type: TradeSide, symbol: String) {
         let client_order_id = Uuid::new_v4().to_string();
 
-        let currency = if order_type == TradeSide::Buy {
-            COIN_CURRENCY
+        let amount = if order_type == TradeSide::Buy {
+            self.coins.get(USDC_SYMBOL).unwrap().balance
         } else {
-            COIN_SYMBOL
+            self.coins.get(&symbol).unwrap().balance
         };
 
-        let amount = self.get_balance_value_by_currency(currency);
         let (quote_size, base_size) = match order_type {
             TradeSide::Buy => (
                 Some(format!("{:.2}", (5.0_f64 * 100.0).floor() / 100.0)),
@@ -114,9 +109,11 @@ impl BotAccount {
             TradeSide::Sell => (None, Some(format!("{:.8}", amount))),
         };
 
+        let product_id = format!("{symbol}-{USDC_SYMBOL}");
+
         let body = serde_json::json!({
             "client_order_id": client_order_id,
-            "product_id":"BTC-USDC",
+            "product_id":product_id,
             "side": order_type,
             "order_configuration":{
                 "market_market_ioc":{
@@ -158,72 +155,57 @@ impl BotAccount {
         }
     }
 
-    pub async fn get_order(&self, order_id: String) -> Option<CurrentOrder> {
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
-
-        let path = format!("{}/{}", "/api/v3/brokerage/orders/historical", order_id);
-
-        let signature = http_sign(self.secret_key.as_bytes(), &timestamp, "GET", &path, "");
-
-        let headers = self.create_headers(&timestamp, &signature);
-
-        let url = format!("{}/{}", HISTORICAL_API_URL, order_id);
-
-        let value = send_get_request::<CurrentOrderResponse>(&self.client, &url, headers).await;
-
-        match value {
-            Ok(v) => Some(v.order),
-            Err(e) => {
-                println!("ORDER VALUE Error: {}", e);
-                None
+    pub async fn handle_message(&mut self, message: (Option<TradeSignal>, Option<f64>)) {
+        if let Some(signal) = message.0 {
+            match signal {
+                TradeSignal::Buy => {}
+                TradeSignal::Sell => {}
+                TradeSignal::Hold => (),
             }
         }
     }
 
-    pub async fn get_product(&self) -> Product {
-        let timestamp = format!("{}", chrono::Utc::now().timestamp());
+    // pub async fn get_order(&self, order_id: String) -> Option<CurrentOrder> {
+    //     let timestamp = format!("{}", chrono::Utc::now().timestamp());
 
-        let signature = http_sign(
-            self.secret_key.as_bytes(),
-            &timestamp,
-            "GET",
-            "/api/v3/brokerage/products/BTC-USD",
-            "",
-        );
+    //     let path = format!("{}/{}", "/api/v3/brokerage/orders/historical", order_id);
 
-        let headers = self.create_headers(&timestamp, &signature);
+    //     let signature = http_sign(self.secret_key.as_bytes(), &timestamp, "GET", &path, "");
 
-        let url = format!("{}/{}-{}", PRODUCT_API_URL, COIN_SYMBOL, BALANCE_CURRENCY);
+    //     let headers = self.create_headers(&timestamp, &signature);
 
-        send_get_request::<Product>(&self.client, &url, headers)
-            .await
-            .expect("Failed to send message")
-    }
+    //     let url = format!("{}/{}", HISTORICAL_API_URL, order_id);
 
-    fn create_headers(&self, timestamp: &str, signature: &str) -> HeaderMap {
-        let mut headers = HeaderMap::new();
+    //     let value = send_get_request::<CurrentOrderResponse>(&self.client, &url, headers).await;
 
-        headers.insert(
-            "CB-ACCESS-KEY",
-            HeaderValue::from_str(&self.api_key).unwrap(),
-        );
-        headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(signature).unwrap());
-        headers.insert(
-            "CB-ACCESS-TIMESTAMP",
-            HeaderValue::from_str(timestamp).unwrap(),
-        );
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    //     match value {
+    //         Ok(v) => Some(v.order),
+    //         Err(e) => {
+    //             println!("ORDER VALUE Error: {}", e);
+    //             None
+    //         }
+    //     }
+    // }
 
-        headers
-    }
+    // pub async fn get_product(&self) -> Product {
+    //     let timestamp = format!("{}", chrono::Utc::now().timestamp());
 
-    fn get_balance_value_by_currency(&self, currency: &str) -> f64 {
-        self.balances
-            .iter()
-            .find(|x| x.currency == currency)
-            .expect("Failed to find currency")
-            .value
-    }
+    //     let signature = http_sign(
+    //         self.secret_key.as_bytes(),
+    //         &timestamp,
+    //         "GET",
+    //         "/api/v3/brokerage/products/BTC-USD",
+    //         "",
+    //     );
+
+    //     let headers = self.create_headers(&timestamp, &signature);
+
+    //     let url = format!("{}/{}-{}", PRODUCT_API_URL, COIN_SYMBOL, BALANCE_CURRENCY);
+
+    //     send_get_request::<Product>(&self.client, &url, headers)
+    //         .await
+    //         .expect("Failed to send message")
+    // }
 
     pub fn is_trade_active(&self) -> bool {
         self.trade_active

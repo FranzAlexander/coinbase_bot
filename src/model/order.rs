@@ -13,8 +13,18 @@ pub struct MarketMarketIoc {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
+pub struct LimitLimitGtd {
+    pub base_size: Option<String>,
+    pub limit_price: Option<String>,
+    pub end_time: Option<String>,
+    pub post_only: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub struct OrderConfiguration {
     pub market_market_ioc: Option<MarketMarketIoc>, // Adjusted this line
+    pub limit_limit_gtd: Option<LimitLimitGtd>,
 }
 
 #[derive(Deserialize, Debug)]

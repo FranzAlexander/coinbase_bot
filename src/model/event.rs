@@ -90,3 +90,28 @@ pub struct Order {
     pub order_side: TradeSide, // Can be one of: BUY, SELL
     pub order_type: String, // Can be one of: Limit, Market, Stop Limit
 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CandleEvent {
+    candles: Candle,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Candle {
+    start: String,
+    #[serde(with = "string_or_float")]
+    low: f64,
+    #[serde(with = "string_or_float")]
+    high: f64,
+    #[serde(with = "string_or_float")]
+    open: f64,
+    #[serde(with = "string_or_float")]
+    close: f64,
+    #[serde(with = "string_or_float")]
+    volume: f64,
+}
+
+pub struct PriceUpdates {
+    pub send: bool,
+    pub symbol: String,
+}

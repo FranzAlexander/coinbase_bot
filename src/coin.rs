@@ -1,15 +1,23 @@
 use crate::model::account::Balance;
 
+pub enum CoinSymbol {
+    Usd,
+    Usdc,
+    Xrp,
+    Ada,
+    Link,
+}
+
 #[derive(Debug)]
 pub struct Coin {
-    pub balance: Balance,
+    pub balance: f64,
     pub active_trade: bool,
     pub min_profit_percentage: f64,
     pub rolling_stop_loss: f64,
 }
 
 impl Coin {
-    pub fn new(balance: Balance) -> Self {
+    pub fn new(balance: f64) -> Self {
         Coin {
             balance,
             active_trade: false,

@@ -8,7 +8,7 @@ use crate::get_start_time;
 
 use super::event::MarketTrade;
 
-pub const CANDLESTICK_TIMEFRAME: i64 = 1;
+pub const CANDLESTICK_TIMEFRAME: i64 = 5;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CandlestickMessage {
@@ -29,8 +29,7 @@ pub struct Candlestick {
 
 impl Candlestick {
     pub fn new(start_time: DateTime<Utc>) -> Self {
-        let end_time = start_time + Duration::seconds(CANDLESTICK_TIMEFRAME); // Change here
-                                                                              // let end_time = start_time + Duration::minutes(1);
+        let end_time = start_time + Duration::minutes(CANDLESTICK_TIMEFRAME); // Change here
 
         Candlestick {
             start: start_time,
@@ -85,7 +84,7 @@ pub fn candle_snapshot(
             candlestick.update(trade.price, trade.size);
         } else {
             // Close current candlestick and send it
-            println!("{} snapshot Candlestick: {}", symbol, candlestick);
+            // println!("{} snapshot Candlestick: {}", symbol, candlestick);
             let _ = tx.blocking_send(CandlestickMessage {
                 symbol: symbol.to_string(),
                 candlestick: candlestick.clone(),
@@ -118,7 +117,7 @@ pub fn candle_update(
                 candlestick.update(trade.price, trade.size);
             } else {
                 // Close current candlestick and send it
-                println!("{} update Candlestick: {}", symbol, candlestick);
+                // println!("{} update Candlestick: {}", symbol, candlestick);
                 let _ = tx.blocking_send(CandlestickMessage {
                     symbol: symbol.to_string(),
                     candlestick: candlestick.clone(),
