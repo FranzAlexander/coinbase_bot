@@ -6,9 +6,9 @@ use std::{
     },
 };
 
-use account::{ADA_SYMBOL, BTC_SYMBOL, ETH_SYMBOL, USDC_SYMBOL, XRP_SYMBOL};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
+use coin::CoinSymbol;
 use futures::{SinkExt, StreamExt};
 use model::{
     account::ActiveTrade,
@@ -27,9 +27,10 @@ use tokio::{
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{error, event, info, Level};
 use url::Url;
+use util::insert_into_hashmap;
 
 use crate::{
-    account::{BotAccount, USD_SYMBOL},
+    account::BotAccount,
     model::{channel::AccountChannelMessage, event::Event},
     trading_bot::{TradeSignal, TradingBot},
     util::{market_subcribe_string, subscribe},
@@ -69,7 +70,7 @@ async fn main() -> Result<()> {
     let trading_bot_keep_going = keep_running.clone();
 
     launch_processing_tasks(rx, account_channel_tx.clone(), keep_running.clone());
-    launch_websocket_tasks(url, tx, bot_signal_rx, keep_running.clone());
+    launch_websocket_tasks(url, tx, account_channel_rx, keep_running.clone());
 
     tokio::signal::ctrl_c().await?;
     info!("Received shutdown signal. Gracefully terminating...");
@@ -104,7 +105,7 @@ fn launch_processing_tasks(
 fn launch_websocket_tasks(
     url: Url,
     tx: mpsc::Sender<Vec<MarketTradeEvent>>,
-    mut signal_rx: mpsc::Receiver<TradeSignal>,
+    mut account_channel_rx: mpsc::Receiver<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
 ) {
     let price_updates = Arc::new(Mutex::new(PriceUpdates {
@@ -117,20 +118,20 @@ fn launch_websocket_tasks(
     let (price_tx, mut price_rx) = mpsc::channel::<f64>(10);
     tokio::spawn(async move {
         bot_account_run(
-            &mut signal_rx,
+            &mut account_channel_rx,
             bot_account_keep_running,
             bot_price_update,
-            &mut price_rx,
         )
         .await
     });
 
-    let symbols = [BTC_SYMBOL, XRP_SYMBOL, ETH_SYMBOL, ADA_SYMBOL];
-    for &symbol in symbols.iter() {
+    let symbols = [CoinSymbol::Xrp, CoinSymbol::Link];
+    for symbol in symbols.into_iter() {
         let websocket_url = url.clone();
         let websocket_tx = tx.clone();
         let websocket_keep_running = keep_running.clone();
-        let market_string = market_subcribe_string(symbol, USD_SYMBOL);
+        let market_string =
+            market_subcribe_string(&String::from(symbol), &String::from(CoinSymbol::Usd));
         let price_update = price_updates.clone();
         let websocket_price_tx = price_tx.clone();
         tokio::spawn(async move {
@@ -174,7 +175,6 @@ async fn run(
                                     }
                                     Event::MarketTrades(market_trades) => {
                                         let _ = tx.send(market_trades.clone()).await;
-                                        info!("TRADES: {:?}", market_trades);
                                         {
                                             let locked_price = price_update.lock().await;
                                             if locked_price.send && locked_price.symbol == market {
@@ -228,10 +228,9 @@ fn candle(
     keep_running: Arc<AtomicBool>,
 ) {
     let mut candlesticks = HashMap::new();
-    candlesticks.insert(BTC_SYMBOL.to_string(), Candlestick::new(Utc::now()));
-    candlesticks.insert(XRP_SYMBOL.to_string(), Candlestick::new(Utc::now()));
-    candlesticks.insert(ETH_SYMBOL.to_string(), Candlestick::new(Utc::now()));
-    candlesticks.insert(ADA_SYMBOL.to_string(), Candlestick::new(Utc::now()));
+    candlesticks.insert(String::from(CoinSymbol::Xrp), Candlestick::new(Utc::now()));
+    candlesticks.insert(String::from(CoinSymbol::Ada), Candlestick::new(Utc::now()));
+    candlesticks.insert(String::from(CoinSymbol::Link), Candlestick::new(Utc::now()));
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(market_trades) = rx.blocking_recv() {
@@ -257,10 +256,24 @@ fn trading_bot_run(
     keep_running: Arc<AtomicBool>,
 ) {
     let mut trading_bots = HashMap::new();
-    trading_bots.insert(format!("{}-{}", BTC_SYMBOL, USD_SYMBOL), TradingBot::new());
-    trading_bots.insert(format!("{}-{}", XRP_SYMBOL, USD_SYMBOL), TradingBot::new());
-    trading_bots.insert(format!("{}-{}", ETH_SYMBOL, USD_SYMBOL), TradingBot::new());
-    trading_bots.insert(format!("{}-{}", ADA_SYMBOL, USD_SYMBOL), TradingBot::new());
+    insert_into_hashmap::<TradingBot>(
+        &mut trading_bots,
+        CoinSymbol::Xrp,
+        CoinSymbol::Usd,
+        TradingBot::new(),
+    );
+    insert_into_hashmap::<TradingBot>(
+        &mut trading_bots,
+        CoinSymbol::Ada,
+        CoinSymbol::Usd,
+        TradingBot::new(),
+    );
+    insert_into_hashmap::<TradingBot>(
+        &mut trading_bots,
+        CoinSymbol::Link,
+        CoinSymbol::Usd,
+        TradingBot::new(),
+    );
 
     while keep_running.load(Ordering::Relaxed) {
         if let Some(candlestick) = rx.blocking_recv() {
@@ -278,20 +291,31 @@ async fn bot_account_run(
 ) {
     let mut bot_account = BotAccount::new();
     bot_account.update_balances().await;
+    bot_account.get_transaction_summary().await;
 
     while keep_running.load(Ordering::Relaxed) {
         if let Some(message) = rx.recv().await {
             match message.symbol {
                 coin::CoinSymbol::Xrp => {
-                    bot_account.handle_message((message.signal, message.price));
+                    bot_account
+                        .handle_message((message.signal, message.price))
+                        .await;
                 }
                 coin::CoinSymbol::Ada => {
-                    bot_account.handle_message((message.signal, message.price));
+                    bot_account
+                        .handle_message((message.signal, message.price))
+                        .await;
                 }
                 coin::CoinSymbol::Link => {
-                    bot_account.handle_message((message.signal, message.price));
+                    bot_account
+                        .handle_message((message.signal, message.price))
+                        .await;
                 }
-                coin::CoinSymbol::Usd | coin::CoinSymbol::Usdc => (),
+                coin::CoinSymbol::Usd
+                | coin::CoinSymbol::Usdc
+                | coin::CoinSymbol::Btc
+                | coin::CoinSymbol::Eth => (),
+                CoinSymbol::Unknown => (),
             }
             // if signal == TradeSignal::Sell {
             //     // if signal == TradeSignal::Sell && bot_account.is_trade_active() {
@@ -308,5 +332,6 @@ async fn bot_account_run(
             //     // bot_account.update_balances().await;
             // }
         }
+        info!("PRINTT");
     }
 }

@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use super::{string_or_float, OrderStatus};
+use crate::coin::CoinSymbol;
+
+use super::string_or_float;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -24,7 +25,7 @@ pub struct AccountList {
 pub struct Account {
     pub uuid: String,
     pub name: String,
-    pub currency: String,
+    pub currency: CoinSymbol,
     pub available_balance: Balance,
     pub default: bool,
     pub active: bool,

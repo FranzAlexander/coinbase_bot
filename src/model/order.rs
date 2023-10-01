@@ -4,6 +4,11 @@ use uuid::Uuid;
 
 use super::{string_or_float, OrderStatus}; // I assume you're using the 'uuid' crate
 
+pub enum TradeOrderType {
+    Market,
+    Limit,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct MarketMarketIoc {
@@ -13,10 +18,9 @@ pub struct MarketMarketIoc {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
-pub struct LimitLimitGtd {
+pub struct LimitLimitGtc {
     pub base_size: Option<String>,
     pub limit_price: Option<String>,
-    pub end_time: Option<String>,
     pub post_only: Option<bool>,
 }
 
@@ -24,7 +28,7 @@ pub struct LimitLimitGtd {
 #[serde(rename_all = "snake_case")]
 pub struct OrderConfiguration {
     pub market_market_ioc: Option<MarketMarketIoc>, // Adjusted this line
-    pub limit_limit_gtd: Option<LimitLimitGtd>,
+    pub limit_limit_gtc: Option<LimitLimitGtc>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -93,4 +97,18 @@ pub struct CurrentOrder {
     pub total_value_after_fees: String,
     pub trigger_status: Option<String>,
     pub user_id: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ApiError {
+    pub error: String,
+    pub code: i32,
+    pub message: String,
+    pub details: ApiErrorDetails,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ApiErrorDetails {
+    pub type_url: String,
+    pub value: String,
 }
