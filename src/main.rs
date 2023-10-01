@@ -291,7 +291,6 @@ async fn bot_account_run(
 ) {
     let mut bot_account = BotAccount::new();
     bot_account.update_balances().await;
-    bot_account.get_transaction_summary().await;
 
     while keep_running.load(Ordering::Relaxed) {
         if let Some(message) = rx.recv().await {
