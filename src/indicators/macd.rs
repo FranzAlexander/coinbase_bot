@@ -2,6 +2,7 @@ use std::fmt;
 
 use super::ema::Ema;
 
+#[derive(Debug)]
 pub struct Macd {
     fast_ema: Ema,
     slow_ema: Ema,

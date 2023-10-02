@@ -6,6 +6,14 @@ use uuid::Uuid;
 
 use super::{string_or_float, string_or_i64, OrderStatus, TradeSide};
 
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum EventType {
+    #[serde(rename = "snapshot")]
+    Snapshot,
+    #[serde(rename = "update")]
+    Update,
+}
+
 // Event enum
 #[derive(Deserialize, Debug)]
 #[serde(tag = "channel", content = "events")]
@@ -48,7 +56,7 @@ impl fmt::Display for HeartbeatEvent {
 #[derive(Debug, Deserialize, Clone)]
 pub struct MarketTradeEvent {
     #[serde(rename = "type")]
-    pub event_type: String,
+    pub event_type: EventType,
     pub trades: Vec<MarketTrade>,
 }
 

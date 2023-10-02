@@ -1,14 +1,12 @@
 use std::{collections::HashMap, fmt};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Timelike, Utc};
 use serde::Deserialize;
 use tokio::sync::mpsc::Sender;
 
-use crate::get_start_time;
-
 use super::event::MarketTrade;
 
-pub const CANDLESTICK_TIMEFRAME: i64 = 5;
+pub const CANDLESTICK_TIMEFRAME: i64 = 60;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CandlestickMessage {
@@ -28,12 +26,10 @@ pub struct Candlestick {
 }
 
 impl Candlestick {
-    pub fn new(start_time: DateTime<Utc>) -> Self {
-        let end_time = start_time + Duration::minutes(CANDLESTICK_TIMEFRAME); // Change here
-
+    pub fn new() -> Self {
         Candlestick {
-            start: start_time,
-            end: end_time,
+            start: Utc::now(),
+            end: Utc::now(),
             high: 0.0,
             low: None,
             open: None,
@@ -62,77 +58,9 @@ impl Candlestick {
     }
 }
 
-pub fn candle_snapshot(
-    candlesticks: &mut HashMap<String, Candlestick>,
-    tx: &Sender<CandlestickMessage>,
-    trades: &[MarketTrade],
-) {
-    if trades.is_empty() {
-        return;
-    }
-
-    let symbol = &trades[0].product_id;
-    let start_time = get_start_time(&trades[0].time);
-
-    let candlestick = candlesticks
-        .entry(symbol.to_string())
-        .or_insert_with(|| Candlestick::new(start_time));
-    candlestick.reset(start_time);
-
-    for trade in trades.iter().rev() {
-        if trade.time >= candlestick.start && trade.time < candlestick.end {
-            candlestick.update(trade.price, trade.size);
-        } else {
-            // Close current candlestick and send it
-            // println!("{} snapshot Candlestick: {}", symbol, candlestick);
-            let _ = tx.blocking_send(CandlestickMessage {
-                symbol: symbol.to_string(),
-                candlestick: candlestick.clone(),
-            });
-
-            // Start a new candlestick
-            let new_start_time = get_start_time(&trade.time);
-            candlestick.reset(new_start_time);
-            candlestick.update(trade.price, trade.size);
-        }
-    }
-}
-
-pub fn candle_update(
-    candlesticks: &mut HashMap<String, Candlestick>,
-    tx: &Sender<CandlestickMessage>,
-    trades: &[MarketTrade],
-) {
-    if trades.is_empty() {
-        return;
-    }
-
-    let symbol = &trades[0].product_id;
-
-    // Ensure a candlestick exists for the symbol, and get a mutable reference to it.
-    // If it doesn't exist yet, this could be an error or you might want to handle it differently.
-    if let Some(candlestick) = candlesticks.get_mut(symbol) {
-        for trade in trades.iter() {
-            if trade.time >= candlestick.start && trade.time < candlestick.end {
-                candlestick.update(trade.price, trade.size);
-            } else {
-                // Close current candlestick and send it
-                // println!("{} update Candlestick: {}", symbol, candlestick);
-                let _ = tx.blocking_send(CandlestickMessage {
-                    symbol: symbol.to_string(),
-                    candlestick: candlestick.clone(),
-                });
-
-                // Start a new candlestick
-                let new_start_time = get_start_time(&trade.time);
-                candlestick.reset(new_start_time);
-                candlestick.update(trade.price, trade.size);
-            }
-        }
-    } else {
-        // Handle cases where the symbol isn't found. Maybe log it, or handle it according to your needs.
-        eprintln!("Received trade update for unknown symbol: {}", symbol);
-    }
+#[inline]
+pub fn get_start_time(end_time: &DateTime<Utc>) -> DateTime<Utc> {
+    end_time.with_second(0).expect("Failed to set seconds to 0")
 }
 
 impl fmt::Display for Candlestick {

@@ -19,6 +19,8 @@ use crate::{
     util::{create_headers, http_sign, send_get_request},
 };
 
+pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
+
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
@@ -33,7 +35,7 @@ const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 #[derive(Debug)]
 pub struct BotAccount {
     client: reqwest::Client,
-    coins: HashMap<CoinSymbol, Coin>,
+    pub coins: HashMap<CoinSymbol, Coin>,
     api_key: String,
     secret_key: String,
     fees: Option<FeeData>,
@@ -231,5 +233,9 @@ impl BotAccount {
             }
         }
         "".to_string()
+    }
+
+    pub fn get_api_key(&self) -> &str {
+        &self.api_key
     }
 }
