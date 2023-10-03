@@ -31,10 +31,12 @@ impl Macd {
         }
     }
 
+    #[inline]
     pub fn get_macd_line(&self) -> f64 {
         self.macd_value
     }
 
+    #[inline]
     pub fn get_signal_line(&self) -> f64 {
         self.signal
     }

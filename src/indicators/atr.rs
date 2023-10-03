@@ -45,6 +45,7 @@ impl Atr {
         }
     }
 
+    #[inline]
     pub fn get_atr(&self) -> Option<f64> {
         self.atr_value
     }

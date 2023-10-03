@@ -25,7 +25,7 @@ pub struct AccountList {
 pub struct Account {
     pub uuid: String,
     pub name: String,
-    pub currency: CoinSymbol,
+    pub currency: String,
     pub available_balance: Balance,
     pub default: bool,
     pub active: bool,

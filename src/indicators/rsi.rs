@@ -58,6 +58,7 @@ impl Rsi {
         }
     }
 
+    #[inline]
     // Method to retrieve the current RSI value
     pub fn get_current_rsi(&self) -> Option<f64> {
         self.current_rsi

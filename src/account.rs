@@ -32,10 +32,15 @@ const ACCOUNT_REQUEST_PATH: &str = "/api/v3/brokerage/accounts";
 const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
 const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
+const XRP_HARD_STOP_LOSS: f64 = 0.0006;
+const LINK_HARD_STOP_LOSS: f64 = 0.010;
+const XRP_SOFT_STOP_LOSS: f64 = 0.0003;
+const LINK_SOFT_STOP_LOSS: f64 = 0.004;
+
 #[derive(Debug)]
 pub struct BotAccount {
     client: reqwest::Client,
-    pub coins: HashMap<CoinSymbol, Coin>,
+    coins: HashMap<CoinSymbol, Coin>,
     api_key: String,
     secret_key: String,
     fees: Option<FeeData>,
@@ -65,7 +70,18 @@ impl BotAccount {
         self.fees = Some(fee_data);
 
         for account in accounts.accounts.into_iter() {
-            match account.currency {
+            let coin_symbol = match account.available_balance.currency.as_str() {
+                "ADA" => CoinSymbol::Ada,
+                "LINK" => CoinSymbol::Link,
+                "USD" => CoinSymbol::Usd,
+                "USDC" => CoinSymbol::Usdc,
+                "XRP" => CoinSymbol::Xrp,
+                "BTC" => CoinSymbol::Btc,
+                "ETH" => CoinSymbol::Eth,
+                // Add any other coin mappings here
+                _ => CoinSymbol::Unknown,
+            };
+            match coin_symbol {
                 CoinSymbol::Ada
                 | CoinSymbol::Link
                 | CoinSymbol::Usd
@@ -74,7 +90,7 @@ impl BotAccount {
                 | CoinSymbol::Btc
                 | CoinSymbol::Eth => {
                     self.coins
-                        .insert(account.currency, Coin::new(account.available_balance.value));
+                        .insert(coin_symbol, Coin::new(account.available_balance.value));
                 }
                 CoinSymbol::Unknown => (),
             }
@@ -109,7 +125,8 @@ impl BotAccount {
             .expect("Failed to send get request!")
     }
 
-    pub async fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol) {
+    pub async fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
+        let price = self.get_product(symbol).await;
         let client_order_id = Uuid::new_v4().to_string();
 
         let amount = self.get_currency_amount(order_type.clone(), &symbol);
@@ -172,19 +189,22 @@ impl BotAccount {
             .expect("Failed to read json");
 
         if order.success {
+            let coin = self.coins.get_mut(&symbol).unwrap();
             match order_type {
-                TradeSide::Buy => {}
-                TradeSide::Sell => {}
-            }
-        }
-    }
+                TradeSide::Buy => {
+                    coin.active_trade = true;
 
-    pub async fn handle_message(&mut self, message: (Option<TradeSignal>, Option<f64>)) {
-        if let Some(signal) = message.0 {
-            match signal {
-                TradeSignal::Buy => {}
-                TradeSignal::Sell => {}
-                TradeSignal::Hold => (),
+                    let new_price = price.price + atr;
+
+                    if symbol == CoinSymbol::Xrp {
+                        coin.hard_stop = price.price - XRP_HARD_STOP_LOSS;
+                    } else {
+                        coin.hard_stop = price.price - LINK_HARD_STOP_LOSS;
+                    }
+
+                    coin.rolling_stop_loss = new_price;
+                }
+                TradeSide::Sell => coin.reset(),
             }
         }
     }
@@ -222,7 +242,7 @@ impl BotAccount {
     fn get_base_size(&self, symbol: CoinSymbol, order_type: TradeSide) -> String {
         if symbol == CoinSymbol::Xrp {
             if order_type == TradeSide::Buy {
-                return format!("{:.4}", (5.0_f64 * 100.0).floor() / 100.0).to_string();
+                return format!("{:.4}", (50.0_f64 * 100.0).floor() / 100.0).to_string();
                 // return format!(
                 //     "{:.4}",
                 //     (self.get_currency_amount(order_type, &symbol) * 100.0).floor() / 100
@@ -235,7 +255,30 @@ impl BotAccount {
         "".to_string()
     }
 
+    #[inline]
     pub fn get_api_key(&self) -> &str {
         &self.api_key
+    }
+
+    #[inline]
+    pub fn coin_trade_active(&self, symbol: &CoinSymbol) -> bool {
+        self.coins.get(symbol).unwrap().active_trade
+    }
+
+    pub async fn update_coin_position(&mut self, symbol: &CoinSymbol, high: f64, atr: f64) {
+        let coin = self.coins.get_mut(&symbol).unwrap();
+
+        if !coin.rolling_stop_loss_first_hit {
+            if coin.rolling_stop_loss >= high {
+                coin.rolling_stop_loss_first_hit = true;
+                coin.rolling_stop_loss = high + atr;
+            }
+        } else {
+            if coin.rolling_stop_loss >= high {
+                coin.rolling_stop_loss = high + atr;
+            } else {
+                self.create_order(TradeSide::Sell, *symbol, atr).await;
+            }
+        }
     }
 }

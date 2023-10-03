@@ -12,6 +12,7 @@ use futures::StreamExt;
 use model::{
     candlestick::{get_start_time, Candlestick},
     event::EventType,
+    TradeSide,
 };
 use tokio::{
     sync::{
@@ -22,11 +23,14 @@ use tokio::{
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{error, event, info, Level};
-use trading_bot::TradingBot;
+use trading_bot::{TradeSignal, TradingBot};
 use util::market_subcribe_string;
 
 use crate::{
-    model::{channel::IndicatorChannelMessage, event::Event},
+    model::{
+        channel::{AccountChannelMessage, IndicatorChannelMessage},
+        event::Event,
+    },
     trading_bot::IndicatorTimeframe,
     util::subscribe,
 };
@@ -43,11 +47,12 @@ async fn main() -> anyhow::Result<()> {
     setup_logging()?;
 
     let (indicator_tx, indicator_rx) = mpsc::channel::<IndicatorChannelMessage>(200);
+    let (account_tx, account_rx) = mpsc::channel::<AccountChannelMessage>(200);
 
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    launch_processing_tasks(indicator_rx, keep_running.clone());
-    launch_websocket_tasks(indicator_tx, keep_running.clone());
+    launch_processing_tasks(indicator_rx, account_tx.clone(), keep_running.clone());
+    launch_websocket_tasks(indicator_tx, account_rx, keep_running.clone());
 
     tokio::signal::ctrl_c().await?;
     info!("Received shutdown signal. Gracefully terminating...");
@@ -65,9 +70,13 @@ fn setup_logging() -> anyhow::Result<()> {
 
 fn launch_websocket_tasks(
     indicator_tx: Sender<IndicatorChannelMessage>,
+    mut account_rx: Receiver<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
 ) {
-    let bot_account = Arc::new(Mutex::new(BotAccount::new()));
+    let bot_account_keep_running = keep_running.clone();
+
+    tokio::spawn(async move { run_bot_account(&mut account_rx, bot_account_keep_running).await });
+
     let symbols = [CoinSymbol::Xrp, CoinSymbol::Link];
 
     for symbol in symbols.into_iter() {
@@ -76,33 +85,26 @@ fn launch_websocket_tasks(
             &String::from(symbol.clone()),
             &String::from(CoinSymbol::Usd),
         );
-        let websocket_bot = bot_account.clone();
         let websocket_tx = indicator_tx.clone();
+
         tokio::spawn(async move {
-            run_websocket(
-                symbol,
-                market_string,
-                websocket_keep_running,
-                websocket_bot,
-                websocket_tx,
-            )
-            .await
+            run_websocket(symbol, market_string, websocket_keep_running, websocket_tx).await
         });
     }
 }
 
 fn launch_processing_tasks(
     mut indicator_rx: Receiver<IndicatorChannelMessage>,
+    account_tx: Sender<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
 ) {
-    spawn_blocking(move || run_indicator(&mut indicator_rx, keep_running));
+    spawn_blocking(move || run_indicator(&mut indicator_rx, account_tx, keep_running));
 }
 
 async fn run_websocket(
     symbol: CoinSymbol,
     market: String,
     keep_running: Arc<AtomicBool>,
-    bot_account: Arc<Mutex<BotAccount>>,
     indicator_tx: Sender<IndicatorChannelMessage>,
 ) {
     while keep_running.load(Ordering::Relaxed) {
@@ -110,16 +112,7 @@ async fn run_websocket(
             Ok((mut ws_stream, _)) => {
                 info!("Connected to server!");
 
-                {
-                    let locked_account = bot_account.lock().await;
-                    subscribe(
-                        &mut ws_stream,
-                        &market,
-                        "subscribe",
-                        locked_account.get_api_key(),
-                    )
-                    .await;
-                }
+                subscribe(&mut ws_stream, &market, "subscribe").await;
 
                 while let Some(msg) = ws_stream.next().await {
                     match msg {
@@ -135,7 +128,6 @@ async fn run_websocket(
                                     Event::MarketTrades(market_trades) => {
                                         let _ = indicator_tx
                                             .send(IndicatorChannelMessage {
-                                                timeframe: IndicatorTimeframe::PerTrade,
                                                 symbol: symbol.clone(),
                                                 trades: market_trades,
                                             })
@@ -170,6 +162,7 @@ async fn run_websocket(
 
 fn run_indicator(
     indicator_rx: &mut Receiver<IndicatorChannelMessage>,
+    account_tx: Sender<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, (TradingBot, Candlestick)> = HashMap::new();
@@ -191,22 +184,64 @@ fn run_indicator(
 
                     for trade in market_trades.trades.iter().rev() {
                         indicator_bot.0.per_trade_update(trade.clone());
+                        // let _ = account_tx.blocking_send(AccountChannelMessage {
+                        //     symbol: trades_msg.symbol,
+                        //     price: Some(trade.price),
+                        //     signal: None,
+                        //     atr: None,
+                        // });
 
                         if trade.time >= indicator_bot.1.start && trade.time < indicator_bot.1.end {
                             indicator_bot.1.update(trade.price, trade.size);
                         } else {
                             indicator_bot.0.one_minute_update(indicator_bot.1.clone());
+                            println!("Candle: {}", indicator_bot.1);
+                            let _ = account_tx.blocking_send(AccountChannelMessage {
+                                symbol: trades_msg.symbol,
+                                price: Some(indicator_bot.1.high),
+                                signal: Some(
+                                    indicator_bot.0.get_signal(IndicatorTimeframe::OneMinute),
+                                ),
+                                atr: Some(indicator_bot.0.get_atr_value().unwrap_or(0.0)),
+                            });
                             indicator_bot.1.reset(get_start_time(&trade.time));
                         }
                     }
-                    println!("BOT: {:?}", indicator_bot.0);
-                    println!(
-                        "{:?}",
-                        indicator_bot.0.get_signal(trades_msg.timeframe.clone())
-                    );
                 }
             } else {
                 println!("Symbol not found");
+            }
+        }
+    }
+}
+
+async fn run_bot_account(
+    account_rx: &mut Receiver<AccountChannelMessage>,
+    keep_running: Arc<AtomicBool>,
+) {
+    let mut bot_account = BotAccount::new();
+
+    bot_account.update_balances().await;
+
+    while keep_running.load(Ordering::Relaxed) {
+        while let Some(account_msg) = account_rx.recv().await {
+            if let (Some(price), Some(trade_signal), Some(atr_value)) =
+                (account_msg.price, account_msg.signal, account_msg.atr)
+            {
+                if bot_account.coin_trade_active(&account_msg.symbol) {
+                    bot_account
+                        .update_coin_position(&account_msg.symbol, price, atr_value)
+                        .await;
+                }
+
+                if trade_signal == TradeSignal::Buy {
+                    if !bot_account.coin_trade_active(&account_msg.symbol) {
+                        bot_account
+                            .create_order(TradeSide::Buy, account_msg.symbol, atr_value)
+                            .await;
+                        bot_account.update_balances().await;
+                    }
+                }
             }
         }
     }

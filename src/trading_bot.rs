@@ -19,7 +19,9 @@ const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 const MAX_CROSS_PERIOD: usize = 4;
 const MIN_CANDLE_PROCCESSED: usize = 20;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+const ATR_MODIFIER: f64 = 1.5;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {
     PerTrade,
     OneMinute,
@@ -114,7 +116,7 @@ impl TradingBot {
     pub fn one_minute_update(&mut self, candle: Candlestick) {
         self.long_trading.update(candle.close);
         self.atr
-            .update(candle.high, candle.low.unwrap(), candle.close);
+            .update(candle.high, candle.low.unwrap_or(0.0), candle.close);
 
         if self.count <= MIN_CANDLE_PROCCESSED {
             self.count += 1;
@@ -125,8 +127,16 @@ impl TradingBot {
         if timeframe == IndicatorTimeframe::PerTrade {
             self.short_trading.get_rsi_signal()
         } else {
-            if self.count <= MIN_CANDLE_PROCCESSED {
-                return TradeSignal::Hold;
+            if self.count > MIN_CANDLE_PROCCESSED {
+                let rsi_signal = self.check_rsi_signal();
+                let macd_signal = self.long_trading.get_macd_signal();
+                if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
+                    return TradeSignal::Buy;
+                } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
+                    return TradeSignal::Sell;
+                } else {
+                    return TradeSignal::Hold;
+                }
             }
             TradeSignal::Hold
         }
@@ -156,29 +166,11 @@ impl TradingBot {
         self.last_rsi_cross
     }
 
-    // pub fn get_signal(&mut self) -> TradeSignal {
-    //     if self.count <= MIN_CANDLE_PROCCESSED {
-    //         return TradeSignal::Hold;
-    //     }
-
-    //     let (macd_line, macd_signal) = (self.macd.get_macd_line(), self.macd.get_signal_line());
-
-    //     let macd_trade_signal = self.get_macd_signal(macd_line, macd_signal);
-
-    //     if macd_trade_signal == TradeSignal::Buy {
-    //         TradeSignal::Buy
-    //     } else if macd_trade_signal == TradeSignal::Sell {
-    //         TradeSignal::Sell
-    //     } else {
-    //         TradeSignal::Hold
-    //     }
-    // }
-
-    // fn get_macd_signal(&self, macd_line: f64, macd_signal: f64) -> TradeSignal {
-    //     if macd_line > macd_signal {
-    //         TradeSignal::Buy
-    //     } else {
-    //         TradeSignal::Sell
-    //     }
-    // }
+    pub fn get_atr_value(&self) -> Option<f64> {
+        if let Some(atr) = self.atr.get_atr() {
+            Some(atr * ATR_MODIFIER)
+        } else {
+            None
+        }
+    }
 }
