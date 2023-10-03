@@ -14,8 +14,9 @@ pub enum TradeSignal {
 
 const RSI_OVERSOLD: f64 = 40.0;
 const RSI_OVERBROUGHT: f64 = 60.0;
+const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
-const MAX_MACD_SIGNAL_PERIOD: usize = 4;
+const MAX_CROSS_PERIOD: usize = 4;
 const MIN_CANDLE_PROCCESSED: usize = 20;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -74,18 +75,20 @@ impl TradingIndicator {
             TradeSignal::Hold
         }
     }
+
+    pub fn get_rsi(&self) -> Option<f64> {
+        self.rsi.get_current_rsi()
+    }
 }
+
 #[derive(Debug)]
 pub struct TradingBot {
     pub short_trading: TradingIndicator,
     long_trading: TradingIndicator,
     atr: Atr,
     count: usize,
-    last_rsi_cross: TradeSignal, // price: f64,
-                                 // macd: Macd,
-                                 // rsi: Rsi,
-                                 // count: usize,
-                                 // current_macd_signal: TradeSignal,
+    last_rsi_cross: TradeSignal,
+    since_last_cross: usize,
 }
 
 impl TradingBot {
@@ -100,6 +103,7 @@ impl TradingBot {
             atr,
             count: 0,
             last_rsi_cross: TradeSignal::Hold,
+            since_last_cross: 0,
         }
     }
 
@@ -128,7 +132,29 @@ impl TradingBot {
         }
     }
 
-    pub fn check_rsi_signal(&mut self) {}
+    pub fn check_rsi_signal(&mut self) -> TradeSignal {
+        let current_signal = self.long_trading.get_rsi_signal();
+
+        if current_signal == self.last_rsi_cross {
+            self.since_last_cross += 1;
+            if self.since_last_cross > MAX_CROSS_PERIOD - 1 {
+                if let Some(rsi) = self.long_trading.get_rsi() {
+                    if rsi <= RSI_CROSS_BUY_CHECK {
+                        self.last_rsi_cross = current_signal;
+                    }
+                }
+            } else if self.since_last_cross > MAX_CROSS_PERIOD {
+                self.last_rsi_cross = TradeSignal::Hold;
+            } else {
+                self.last_rsi_cross = current_signal;
+            }
+        } else {
+            self.since_last_cross = 0;
+            self.last_rsi_cross = current_signal;
+        }
+
+        self.last_rsi_cross
+    }
 
     // pub fn get_signal(&mut self) -> TradeSignal {
     //     if self.count <= MIN_CANDLE_PROCCESSED {
@@ -156,14 +182,3 @@ impl TradingBot {
     //     }
     // }
 }
-
-// impl fmt::Display for TradingBot {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(
-//             f,
-//             "Macd Line: {}, Macd Signal: {}",
-//             self.macd.get_macd_line(),
-//             self.macd.get_signal_line(),
-//         )
-//     }
-// }
