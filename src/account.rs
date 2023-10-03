@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::SystemTime};
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, Timelike, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 
 use serde_json::Value;
@@ -279,5 +279,36 @@ impl BotAccount {
         } else {
             self.create_order(TradeSide::Sell, *symbol, atr).await;
         }
+    }
+
+    pub async fn get_product_candle(&self) {
+        let api_string =
+            self.get_api_string(CoinSymbol::Xrp, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
+        // Current time
+        let now = Utc::now();
+        let start_of_current_minute = now.with_second(0).unwrap().timestamp();
+        let end_of_last_minute = start_of_current_minute - 1;
+        let start_of_last_minute = end_of_last_minute - 59;
+
+        let path = format!("{}/{}", api_string, "candles");
+        let headers = create_headers(&self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
+        let url_string = self.get_api_string(CoinSymbol::Xrp, CoinSymbol::Usdc, PRODUCT_API_URL);
+        let url = format!(
+            "{}/candles?start={}&end={}&granularity={}",
+            url_string, start_of_last_minute, end_of_last_minute, "ONE_MINUTE"
+        );
+
+        let ans = self
+            .client
+            .get(url)
+            .headers(headers)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        println!("{ans}");
     }
 }

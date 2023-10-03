@@ -77,7 +77,7 @@ fn launch_websocket_tasks(
 
     tokio::spawn(async move { run_bot_account(&mut account_rx, bot_account_keep_running).await });
 
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Link];
+    let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         let websocket_keep_running = keep_running.clone();
@@ -166,7 +166,7 @@ fn run_indicator(
     keep_running: Arc<AtomicBool>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, (TradingBot, Candlestick)> = HashMap::new();
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Link];
+    let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(symbol, (TradingBot::new(), Candlestick::new()));
@@ -222,12 +222,14 @@ async fn run_bot_account(
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
+    bot_account.get_product_candle().await;
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
             if let (Some(price), Some(trade_signal), Some(atr_value)) =
                 (account_msg.price, account_msg.signal, account_msg.atr)
             {
+                bot_account.get_product_candle().await;
                 if bot_account.coin_trade_active(&account_msg.symbol) {
                     bot_account
                         .update_coin_position(&account_msg.symbol, price, atr_value)

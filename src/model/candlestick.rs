@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 
 use super::event::MarketTrade;
 
-pub const CANDLESTICK_TIMEFRAME: i64 = 60;
+pub const CANDLESTICK_TIMEFRAME: i64 = 59;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CandlestickMessage {
