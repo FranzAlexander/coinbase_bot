@@ -233,7 +233,13 @@ impl BotAccount {
     #[inline]
     fn get_currency_amount(&self, order_type: TradeSide, symbol: &CoinSymbol) -> f64 {
         if order_type == TradeSide::Buy {
-            self.coins.get(&CoinSymbol::Usdc).unwrap().balance
+            let mut count = 0;
+            for coin in self.coins.iter() {
+                if !coin.1.active_trade {
+                    count += 1;
+                }
+            }
+            self.coins.get(&CoinSymbol::Usdc).unwrap().balance / count as f64
         } else {
             self.coins.get(symbol).unwrap().balance
         }
@@ -268,17 +274,10 @@ impl BotAccount {
     pub async fn update_coin_position(&mut self, symbol: &CoinSymbol, high: f64, atr: f64) {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
-        if !coin.rolling_stop_loss_first_hit {
-            if coin.rolling_stop_loss >= high {
-                coin.rolling_stop_loss_first_hit = true;
-                coin.rolling_stop_loss = high + atr;
-            }
+        if coin.rolling_stop_loss >= high {
+            coin.rolling_stop_loss = high + atr;
         } else {
-            if coin.rolling_stop_loss >= high {
-                coin.rolling_stop_loss = high + atr;
-            } else {
-                self.create_order(TradeSide::Sell, *symbol, atr).await;
-            }
+            self.create_order(TradeSide::Sell, *symbol, atr).await;
         }
     }
 }

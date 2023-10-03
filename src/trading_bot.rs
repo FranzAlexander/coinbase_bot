@@ -17,7 +17,7 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
 const MAX_CROSS_PERIOD: usize = 4;
-const MIN_CANDLE_PROCCESSED: usize = 20;
+const MIN_CANDLE_PROCCESSED: usize = 30;
 
 const ATR_MODIFIER: f64 = 1.5;
 
@@ -36,7 +36,7 @@ pub struct TradingIndicator {
 
 impl TradingIndicator {
     pub fn new(timeframe: IndicatorTimeframe) -> Self {
-        let macd = Macd::new(9, 12, 7);
+        let macd = Macd::new(12, 21, 9);
         let rsi = Rsi::new(14);
 
         TradingIndicator {
