@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::VecDeque, fmt};
 
 use crate::{
     candlestick::Candlestick,
@@ -17,8 +17,8 @@ const RSI_OVERSOLD: f64 = 40.0;
 const RSI_OVERBROUGHT: f64 = 60.0;
 const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
-const MAX_CROSS_PERIOD: usize = 4;
-const MIN_CANDLE_PROCCESSED: usize = 30;
+const MAX_CROSS_PERIOD: usize = 3;
+const MIN_CANDLE_PROCCESSED: usize = 26;
 
 const ATR_MODIFIER: f64 = 0.5;
 
@@ -86,37 +86,39 @@ impl TradingIndicator {
 
 #[derive(Debug)]
 pub struct TradingBot {
-    pub short_trading: TradingIndicator,
     long_trading: TradingIndicator,
     atr: Atr,
     count: usize,
+    latest_rsi_signals: VecDeque<TradeSignal>,
     last_rsi_cross: TradeSignal,
     since_last_cross: usize,
 }
 
 impl TradingBot {
     pub fn new() -> Self {
-        let short_trading = TradingIndicator::new(IndicatorTimeframe::PerTrade);
         let long_trading = TradingIndicator::new(IndicatorTimeframe::OneMinute);
         let atr = Atr::new(14);
 
         TradingBot {
-            short_trading,
             long_trading,
             atr,
             count: 0,
+            latest_rsi_signals: VecDeque::with_capacity(3),
             last_rsi_cross: TradeSignal::Hold,
             since_last_cross: 0,
         }
     }
 
-    pub fn per_trade_update(&mut self, trade: MarketTrade) {
-        self.short_trading.update(trade.price);
-    }
-
     pub fn one_minute_update(&mut self, candle: Candlestick) {
         self.long_trading.update(candle.close);
         self.atr.update(candle.high, candle.low, candle.close);
+
+        if self.latest_rsi_signals.len() > MAX_CROSS_PERIOD {
+            self.latest_rsi_signals.pop_back();
+        }
+
+        self.latest_rsi_signals
+            .push_front(self.long_trading.get_rsi_signal());
 
         if self.count <= MIN_CANDLE_PROCCESSED {
             self.count += 1;
@@ -124,12 +126,12 @@ impl TradingBot {
     }
 
     pub fn get_signal(&mut self, timeframe: IndicatorTimeframe) -> TradeSignal {
-        if timeframe == IndicatorTimeframe::PerTrade {
-            self.short_trading.get_rsi_signal()
-        } else {
+        if timeframe == IndicatorTimeframe::OneMinute {
             if self.count > MIN_CANDLE_PROCCESSED {
                 let rsi_signal = self.check_rsi_signal();
+                println!("RSI SIGNAL: {:?}", rsi_signal);
                 let macd_signal = self.long_trading.get_macd_signal();
+                println!("MACD SIGNAL: {:?}", macd_signal);
                 if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
                     return TradeSignal::Buy;
                 } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
@@ -139,31 +141,39 @@ impl TradingBot {
                 }
             }
             TradeSignal::Hold
+        } else {
+            TradeSignal::Hold
         }
     }
 
     pub fn check_rsi_signal(&mut self) -> TradeSignal {
-        let current_signal = self.long_trading.get_rsi_signal();
-
-        if current_signal == self.last_rsi_cross {
-            self.since_last_cross += 1;
-            if self.since_last_cross > MAX_CROSS_PERIOD - 1 {
-                if let Some(rsi) = self.long_trading.get_rsi() {
-                    if rsi <= RSI_CROSS_BUY_CHECK {
-                        self.last_rsi_cross = current_signal;
-                    }
-                }
-            } else if self.since_last_cross > MAX_CROSS_PERIOD {
-                self.last_rsi_cross = TradeSignal::Hold;
-            } else {
-                self.last_rsi_cross = current_signal;
-            }
+        let buy_signal = self.latest_rsi_signals.contains(&TradeSignal::Buy);
+        if buy_signal {
+            TradeSignal::Buy
         } else {
-            self.since_last_cross = 0;
-            self.last_rsi_cross = current_signal;
+            TradeSignal::Hold
         }
+        // let current_signal = self.long_trading.get_rsi_signal();
 
-        self.last_rsi_cross
+        // if current_signal == self.last_rsi_cross {
+        //     self.since_last_cross += 1;
+        //     if self.since_last_cross > MAX_CROSS_PERIOD - 1 {
+        //         if let Some(rsi) = self.long_trading.get_rsi() {
+        //             if rsi <= RSI_CROSS_BUY_CHECK {
+        //                 self.last_rsi_cross = current_signal;
+        //             }
+        //         }
+        //     } else if self.since_last_cross > MAX_CROSS_PERIOD {
+        //         self.last_rsi_cross = TradeSignal::Hold;
+        //     } else {
+        //         self.last_rsi_cross = current_signal;
+        //     }
+        // } else {
+        //     self.since_last_cross = 0;
+        //     self.last_rsi_cross = current_signal;
+        // }
+
+        // self.last_rsi_cross
     }
 
     pub fn get_atr_value(&self) -> Option<f64> {

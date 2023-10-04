@@ -257,6 +257,7 @@ async fn run_bot_account(
             }
 
             if account_msg.signal == TradeSignal::Buy {
+                info!("HELLO");
                 if !bot_account.coin_trade_active(&account_msg.symbol) {
                     if let Some(atr) = account_msg.atr {
                         bot_account
@@ -266,25 +267,6 @@ async fn run_bot_account(
                     }
                 }
             }
-            //     if let (Some(price), Some(trade_signal), Some(atr_value)) =
-            //         (account_msg.price, account_msg.signal, account_msg.atr)
-            //     {
-            //         // bot_account.get_product_candle().await;
-            //         if bot_account.coin_trade_active(&account_msg.symbol) {
-            //             bot_account
-            //                 .update_coin_position(&account_msg.symbol, price, atr_value)
-            //                 .await;
-            //         }
-
-            //         if trade_signal == TradeSignal::Buy {
-            //             if !bot_account.coin_trade_active(&account_msg.symbol) {
-            //                 bot_account
-            //                     .create_order(TradeSide::Buy, account_msg.symbol, atr_value)
-            //                     .await;
-            //                 bot_account.update_balances().await;
-            //             }
-            //         }
-            //     }
         }
     }
 }
