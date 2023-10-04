@@ -90,7 +90,8 @@ impl BotAccount {
                 | CoinSymbol::Btc
                 | CoinSymbol::Eth => {
                     self.coins
-                        .insert(coin_symbol, Coin::new(account.available_balance.value));
+                        .entry(coin_symbol)
+                        .or_insert(Coin::new(account.available_balance.value));
                 }
                 CoinSymbol::Unknown => (),
             }
@@ -233,7 +234,7 @@ impl BotAccount {
     #[inline]
     fn get_currency_amount(&self, order_type: TradeSide, symbol: &CoinSymbol) -> f64 {
         if order_type == TradeSide::Buy {
-            let mut count = 0;
+            let mut count = 1;
             for coin in self.coins.iter() {
                 if !coin.1.active_trade {
                     count += 1;

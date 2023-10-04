@@ -14,6 +14,7 @@ pub struct AccountChannelMessage {
     pub start: i64,
     pub end: i64,
     // pub price: Option<f64>,
-    // pub signal: Option<TradeSignal>,
-    // pub atr: Option<f64>,
+    pub signal: TradeSignal,
+    pub atr: Option<f64>,
+    pub high: f64,
 }
