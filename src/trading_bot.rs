@@ -20,7 +20,7 @@ const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 const MAX_CROSS_PERIOD: usize = 3;
 const MIN_CANDLE_PROCCESSED: usize = 26;
 
-const ATR_MODIFIER: f64 = 0.5;
+const ATR_MODIFIER: f64 = 0.25;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {

@@ -275,7 +275,7 @@ impl BotAccount {
     pub async fn update_coin_position(&mut self, symbol: &CoinSymbol, high: f64, atr: f64) {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
-        if coin.rolling_stop_loss >= high {
+        if high > coin.rolling_stop_loss {
             coin.rolling_stop_loss = high + atr;
         } else {
             self.create_order(TradeSide::Sell, *symbol, atr).await;
