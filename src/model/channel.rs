@@ -1,7 +1,4 @@
-use crate::{
-    coin::CoinSymbol,
-    trading_bot::{IndicatorTimeframe, TradeSignal},
-};
+use crate::{coin::CoinSymbol, trading_bot::TradeSignal};
 
 use super::event::MarketTradeEvent;
 
@@ -14,7 +11,9 @@ pub struct IndicatorChannelMessage {
 #[derive(Debug)]
 pub struct AccountChannelMessage {
     pub symbol: CoinSymbol,
-    pub price: Option<f64>,
-    pub signal: Option<TradeSignal>,
-    pub atr: Option<f64>,
+    pub start: i64,
+    pub end: i64,
+    // pub price: Option<f64>,
+    // pub signal: Option<TradeSignal>,
+    // pub atr: Option<f64>,
 }

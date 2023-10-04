@@ -1,8 +1,9 @@
 use std::fmt;
 
 use crate::{
+    candlestick::Candlestick,
     indicators::{atr::Atr, ema::Ema, macd::Macd, rsi::Rsi},
-    model::{candlestick::Candlestick, event::MarketTrade},
+    model::event::MarketTrade,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -115,8 +116,7 @@ impl TradingBot {
 
     pub fn one_minute_update(&mut self, candle: Candlestick) {
         self.long_trading.update(candle.close);
-        self.atr
-            .update(candle.high, candle.low.unwrap_or(0.0), candle.close);
+        self.atr.update(candle.high, candle.low, candle.close);
 
         if self.count <= MIN_CANDLE_PROCCESSED {
             self.count += 1;

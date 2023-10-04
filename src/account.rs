@@ -281,21 +281,15 @@ impl BotAccount {
         }
     }
 
-    pub async fn get_product_candle(&self) {
-        let api_string =
-            self.get_api_string(CoinSymbol::Xrp, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
-        // Current time
-        let now = Utc::now();
-        let start_of_current_minute = now.with_second(0).unwrap().timestamp();
-        let end_of_last_minute = start_of_current_minute - 1;
-        let start_of_last_minute = end_of_last_minute - 59;
+    pub async fn get_product_candle(&self, symbol: CoinSymbol, start: i64, end: i64) {
+        let api_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
         let path = format!("{}/{}", api_string, "candles");
         let headers = create_headers(&self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
-        let url_string = self.get_api_string(CoinSymbol::Xrp, CoinSymbol::Usdc, PRODUCT_API_URL);
+        let url_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
         let url = format!(
             "{}/candles?start={}&end={}&granularity={}",
-            url_string, start_of_last_minute, end_of_last_minute, "ONE_MINUTE"
+            url_string, start, end, "ONE_MINUTE"
         );
 
         let ans = self
