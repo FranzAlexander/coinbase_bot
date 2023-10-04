@@ -245,9 +245,6 @@ async fn run_bot_account(
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
-            bot_account
-                .get_product_candle(account_msg.symbol, account_msg.start, account_msg.end)
-                .await;
             if bot_account.coin_trade_active(&account_msg.symbol) {
                 if let Some(atr) = account_msg.atr {
                     bot_account

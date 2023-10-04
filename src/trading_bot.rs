@@ -151,7 +151,7 @@ impl TradingBot {
         if buy_signal {
             TradeSignal::Buy
         } else {
-            TradeSignal::Hold
+            *self.latest_rsi_signals.back().unwrap()
         }
         // let current_signal = self.long_trading.get_rsi_signal();
 
