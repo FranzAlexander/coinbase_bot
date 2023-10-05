@@ -251,23 +251,16 @@ impl BotAccount {
         self.coins.get(&symbol).unwrap().active_trade
     }
 
-    pub async fn update_coin_position(
-        &mut self,
-        symbol: CoinSymbol,
-        high: f64,
-        atr: f64,
-        rsi: TradeSignal,
-    ) -> bool {
+    pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) -> bool {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
         if high - atr > coin.stop_loss {
             coin.stop_loss = high - atr;
             true
-        } else if rsi == TradeSignal::Sell {
-            self.create_order(TradeSide::Sell, symbol, atr).await;
-            false
         } else {
-            true
+            self.create_order(TradeSide::Sell, symbol, atr).await;
+
+            false
         }
     }
 
