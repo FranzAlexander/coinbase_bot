@@ -5,9 +5,8 @@ use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::json;
 use sha2::Sha256;
-use tokio::{net::TcpStream, signal, sync::mpsc, time::Instant};
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tracing::{event, info, instrument, Level};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::coin::CoinSymbol;
 

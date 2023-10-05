@@ -16,10 +16,7 @@ use model::{
     TradeSide,
 };
 use tokio::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Mutex,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     task::spawn_blocking,
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -83,10 +80,8 @@ fn launch_websocket_tasks(
 
     for symbol in symbols.into_iter() {
         let websocket_keep_running = keep_running.clone();
-        let market_string = market_subcribe_string(
-            &String::from(symbol.clone()),
-            &String::from(CoinSymbol::Usd),
-        );
+        let market_string =
+            market_subcribe_string(&String::from(symbol), &String::from(CoinSymbol::Usd));
         let websocket_tx = indicator_tx.clone();
 
         tokio::spawn(async move {
@@ -130,7 +125,7 @@ async fn run_websocket(
                                     Event::MarketTrades(market_trades) => {
                                         let _ = indicator_tx
                                             .send(IndicatorChannelMessage {
-                                                symbol: symbol.clone(),
+                                                symbol,
                                                 trades: market_trades,
                                             })
                                             .await;
@@ -248,7 +243,7 @@ async fn run_bot_account(
             if bot_account.coin_trade_active(&account_msg.symbol) {
                 if let Some(atr) = account_msg.atr {
                     bot_account
-                        .update_coin_position(&account_msg.symbol, account_msg.high, atr)
+                        .update_coin_position(account_msg.symbol, account_msg.high, atr)
                         .await;
                 }
             }

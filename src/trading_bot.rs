@@ -1,9 +1,8 @@
-use std::{collections::VecDeque, fmt};
+use std::collections::VecDeque;
 
 use crate::{
     candlestick::Candlestick,
-    indicators::{atr::Atr, ema::Ema, macd::Macd, rsi::Rsi},
-    model::event::MarketTrade,
+    indicators::{atr::Atr, macd::Macd, rsi::Rsi},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,7 +14,7 @@ pub enum TradeSignal {
 
 const RSI_OVERSOLD: f64 = 40.0;
 const RSI_OVERBROUGHT: f64 = 60.0;
-const RSI_CROSS_BUY_CHECK: f64 = 45.0;
+// const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
 const MAX_CROSS_PERIOD: usize = 3;
 const MIN_CANDLE_PROCCESSED: usize = 26;
@@ -90,8 +89,6 @@ pub struct TradingBot {
     atr: Atr,
     count: usize,
     latest_rsi_signals: VecDeque<TradeSignal>,
-    last_rsi_cross: TradeSignal,
-    since_last_cross: usize,
 }
 
 impl TradingBot {
@@ -104,8 +101,6 @@ impl TradingBot {
             atr,
             count: 0,
             latest_rsi_signals: VecDeque::with_capacity(3),
-            last_rsi_cross: TradeSignal::Hold,
-            since_last_cross: 0,
         }
     }
 
@@ -177,10 +172,6 @@ impl TradingBot {
     }
 
     pub fn get_atr_value(&self) -> Option<f64> {
-        if let Some(atr) = self.atr.get_atr() {
-            Some(atr * ATR_MODIFIER)
-        } else {
-            None
-        }
+        self.atr.get_atr().map(|atr| atr * ATR_MODIFIER)
     }
 }

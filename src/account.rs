@@ -1,22 +1,16 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::collections::HashMap;
 
-use chrono::{Duration, Timelike, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
-
-use serde_json::Value;
-use tracing::info;
 use uuid::Uuid;
 
 use crate::{
     coin::{Coin, CoinSymbol},
     model::{
-        account::{AccountList, Balance, Product},
+        account::{AccountList, Product},
         fee::FeeData,
-        order::{CurrentOrder, CurrentOrderResponse, OrderResponse},
+        order::OrderResponse,
         TradeSide,
     },
-    trading_bot::TradeSignal,
-    util::{create_headers, http_sign, send_get_request},
+    util::{create_headers, send_get_request},
 };
 
 pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
@@ -24,7 +18,6 @@ pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
-const HISTORICAL_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders/historical";
 const SUMMARY_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/transaction_summary";
 
 const PRODUCT_REQUEST_PATH: &str = "/api/v3/brokerage/products";
@@ -211,10 +204,10 @@ impl BotAccount {
     }
 
     async fn get_product(&self, symbol: CoinSymbol) -> Product {
-        let path = self.get_api_string(symbol.clone(), CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
+        let path = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
-        let headers = create_headers(&self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
-        let url = self.get_api_string(symbol.clone(), CoinSymbol::Usdc, PRODUCT_API_URL);
+        let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
+        let url = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
 
         send_get_request::<Product>(&self.client, &url, headers)
             .await
@@ -272,13 +265,13 @@ impl BotAccount {
         self.coins.get(symbol).unwrap().active_trade
     }
 
-    pub async fn update_coin_position(&mut self, symbol: &CoinSymbol, high: f64, atr: f64) {
+    pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
         if high > coin.rolling_stop_loss {
             coin.rolling_stop_loss = high + atr;
         } else {
-            self.create_order(TradeSide::Sell, *symbol, atr).await;
+            self.create_order(TradeSide::Sell, symbol, atr).await;
         }
     }
 
@@ -286,7 +279,7 @@ impl BotAccount {
         let api_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
         let path = format!("{}/{}", api_string, "candles");
-        let headers = create_headers(&self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
+        let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
         let url_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
         let url = format!(
             "{}/candles?start={}&end={}&granularity={}",

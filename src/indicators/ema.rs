@@ -37,10 +37,6 @@ impl Ema {
 
         self.current
     }
-
-    pub fn get_ema(&self) -> Option<f64> {
-        self.current
-    }
 }
 
 impl fmt::Display for Ema {

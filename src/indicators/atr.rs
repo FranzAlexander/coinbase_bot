@@ -2,7 +2,6 @@
 pub struct Atr {
     period: usize,
     prev_close: Option<f64>,
-    true_range_sum: f64,
     values: Vec<f64>,
     atr_value: Option<f64>,
 }
@@ -12,7 +11,6 @@ impl Atr {
         Atr {
             period,
             prev_close: None,
-            true_range_sum: 0.0,
             values: Vec::with_capacity(period),
             atr_value: None,
         }

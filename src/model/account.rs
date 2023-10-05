@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::coin::CoinSymbol;
-
 use super::string_or_float;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,34 +47,4 @@ pub struct Balance {
 pub struct Product {
     #[serde(with = "string_or_float")]
     pub price: f64,
-}
-
-#[derive(Debug)]
-pub struct ActiveTrade {
-    pub active: bool,
-    pub order_id: String,
-    pub client_order_id: String,
-    pub price: f64,
-    pub amount: f64,
-    pub stop_loss: f64,
-}
-
-impl ActiveTrade {
-    pub fn new(
-        active: bool,
-        order_id: String,
-        client_order_id: String,
-        price: f64,
-        amount: f64,
-        stop_loss: f64,
-    ) -> Self {
-        ActiveTrade {
-            active,
-            order_id,
-            client_order_id,
-            price,
-            amount,
-            stop_loss,
-        }
-    }
 }
