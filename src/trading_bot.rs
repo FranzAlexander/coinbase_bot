@@ -124,9 +124,7 @@ impl TradingBot {
         if timeframe == IndicatorTimeframe::OneMinute {
             if self.count > MIN_CANDLE_PROCCESSED {
                 let rsi_signal = self.check_rsi_signal();
-                println!("RSI SIGNAL: {:?}", rsi_signal);
                 let macd_signal = self.long_trading.get_macd_signal();
-                println!("MACD SIGNAL: {:?}", macd_signal);
                 if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
                     return TradeSignal::Buy;
                 } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
@@ -139,6 +137,10 @@ impl TradingBot {
         } else {
             TradeSignal::Hold
         }
+    }
+
+    pub fn get_macd_signal(&self) -> TradeSignal {
+        self.long_trading.get_macd_signal()
     }
 
     pub fn check_rsi_signal(&mut self) -> TradeSignal {
@@ -169,6 +171,10 @@ impl TradingBot {
         // }
 
         // self.last_rsi_cross
+    }
+
+    pub fn get_rsi_signal(&self) -> TradeSignal {
+        self.long_trading.get_rsi_signal()
     }
 
     pub fn get_atr_value(&self) -> Option<f64> {

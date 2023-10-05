@@ -15,37 +15,6 @@ pub enum CoinSymbol {
     Unknown,
 }
 
-#[derive(Debug)]
-pub struct Coin {
-    pub balance: f64,
-    pub active_trade: bool,
-    pub min_profit_percentage: f64,
-    pub rolling_stop_loss: f64,
-    pub rolling_stop_loss_first_hit: bool,
-    pub hard_stop: f64,
-}
-
-impl Coin {
-    pub fn new(balance: f64) -> Self {
-        Coin {
-            balance,
-            active_trade: false,
-            min_profit_percentage: 0.0,
-            rolling_stop_loss: 0.0,
-            rolling_stop_loss_first_hit: false,
-            hard_stop: 0.0,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.active_trade = false;
-        self.min_profit_percentage = 0.0;
-        self.rolling_stop_loss = 0.0;
-        self.rolling_stop_loss_first_hit = false;
-        self.hard_stop = 0.0;
-    }
-}
-
 impl From<CoinSymbol> for String {
     fn from(value: CoinSymbol) -> Self {
         String::from(match value {
@@ -75,5 +44,27 @@ impl FromStr for CoinSymbol {
             "ETH" => Ok(CoinSymbol::Eth),
             _ => Err(()),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Coin {
+    pub balance: f64,
+    pub active_trade: bool,
+    pub stop_loss: f64,
+}
+
+impl Coin {
+    pub fn new(balance: f64, active_trade: bool, stop_loss: f64) -> Self {
+        Coin {
+            balance,
+            active_trade,
+            stop_loss,
+        }
+    }
+
+    pub fn update_coin(&mut self, active_trade: bool, stop_loss: f64) {
+        self.active_trade = active_trade;
+        self.stop_loss = stop_loss;
     }
 }

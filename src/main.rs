@@ -199,6 +199,18 @@ fn run_indicator(
                         }
                     } else {
                         for trade in market_trades.trades.iter().rev() {
+                            if indicator_bot.0.get_macd_signal() == TradeSignal::Buy {
+                                let atr = indicator_bot.0.get_atr_value();
+                                let _ = account_tx.blocking_send(AccountChannelMessage {
+                                    timeframe: IndicatorTimeframe::PerTrade,
+                                    symbol: trades_msg.symbol,
+                                    start: 0,
+                                    end: 0,
+                                    signal: indicator_bot.0.get_rsi_signal(),
+                                    high: trade.price,
+                                    atr,
+                                });
+                            }
                             if trade.time < indicator_bot.1.end {
                                 indicator_bot.1.update(trade.price, trade.size);
                             } else {
@@ -209,6 +221,7 @@ fn run_indicator(
                                     indicator_bot.0.get_signal(IndicatorTimeframe::OneMinute);
                                 let atr = indicator_bot.0.get_atr_value();
                                 let _ = account_tx.blocking_send(AccountChannelMessage {
+                                    timeframe: IndicatorTimeframe::OneMinute,
                                     symbol: trades_msg.symbol,
                                     start: indicator_bot.1.start.timestamp(),
                                     end: indicator_bot.1.end.timestamp(),
@@ -240,24 +253,27 @@ async fn run_bot_account(
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
-            if bot_account.coin_trade_active(&account_msg.symbol) {
-                if let Some(atr) = account_msg.atr {
-                    bot_account
-                        .update_coin_position(account_msg.symbol, account_msg.high, atr)
-                        .await;
-                }
+            if account_msg.timeframe == IndicatorTimeframe::PerTrade
+                && bot_account.coin_trade_active(account_msg.symbol)
+            {
+                bot_account
+                    .update_coin_position(
+                        account_msg.symbol,
+                        account_msg.high,
+                        account_msg.atr.unwrap(),
+                        account_msg.signal,
+                    )
+                    .await;
             }
 
-            if account_msg.signal == TradeSignal::Buy {
-                info!("HELLO");
-                if !bot_account.coin_trade_active(&account_msg.symbol) {
-                    if let Some(atr) = account_msg.atr {
-                        bot_account
-                            .create_order(TradeSide::Buy, account_msg.symbol, atr)
-                            .await;
-                        bot_account.update_balances().await;
-                    }
-                }
+            if account_msg.timeframe == IndicatorTimeframe::OneMinute
+                && !bot_account.coin_trade_active(account_msg.symbol)
+            {
+                bot_account
+                    .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
+                    .await;
+                bot_account.update_balances().await;
+                bot_account.get_coin(account_msg.symbol);
             }
         }
     }

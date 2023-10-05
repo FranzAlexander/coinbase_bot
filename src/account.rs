@@ -10,6 +10,7 @@ use crate::{
         order::OrderResponse,
         TradeSide,
     },
+    trading_bot::TradeSignal,
     util::{create_headers, send_get_request},
 };
 
@@ -82,9 +83,11 @@ impl BotAccount {
                 | CoinSymbol::Xrp
                 | CoinSymbol::Btc
                 | CoinSymbol::Eth => {
-                    self.coins
-                        .entry(coin_symbol)
-                        .or_insert(Coin::new(account.available_balance.value));
+                    self.coins.entry(coin_symbol).or_insert(Coin::new(
+                        account.available_balance.value,
+                        false,
+                        0.0,
+                    ));
                 }
                 CoinSymbol::Unknown => (),
             }
@@ -123,7 +126,7 @@ impl BotAccount {
         let price = self.get_product(symbol).await;
         let client_order_id = Uuid::new_v4().to_string();
 
-        let amount = self.get_currency_amount(order_type.clone(), &symbol);
+        let amount = self.get_currency_amount(order_type.clone(), symbol);
 
         let (quote_size, base_size) = match order_type {
             TradeSide::Buy => (
@@ -186,19 +189,11 @@ impl BotAccount {
             let coin = self.coins.get_mut(&symbol).unwrap();
             match order_type {
                 TradeSide::Buy => {
-                    coin.active_trade = true;
+                    let new_price = price.price - atr;
 
-                    let new_price = price.price + atr;
-
-                    if symbol == CoinSymbol::Xrp {
-                        coin.hard_stop = price.price - XRP_HARD_STOP_LOSS;
-                    } else {
-                        coin.hard_stop = price.price - LINK_HARD_STOP_LOSS;
-                    }
-
-                    coin.rolling_stop_loss = new_price;
+                    coin.update_coin(true, new_price);
                 }
-                TradeSide::Sell => coin.reset(),
+                TradeSide::Sell => coin.update_coin(false, 0.0),
             }
         }
     }
@@ -225,9 +220,9 @@ impl BotAccount {
     }
 
     #[inline]
-    fn get_currency_amount(&self, order_type: TradeSide, symbol: &CoinSymbol) -> f64 {
+    fn get_currency_amount(&self, order_type: TradeSide, symbol: CoinSymbol) -> f64 {
         if order_type == TradeSide::Buy {
-            let mut count = 1;
+            let mut count = 0;
             for coin in self.coins.iter() {
                 if !coin.1.active_trade {
                     count += 1;
@@ -235,7 +230,7 @@ impl BotAccount {
             }
             self.coins.get(&CoinSymbol::Usdc).unwrap().balance / count as f64
         } else {
-            self.coins.get(symbol).unwrap().balance
+            self.coins.get(&symbol).unwrap().balance
         }
     }
 
@@ -261,16 +256,22 @@ impl BotAccount {
     }
 
     #[inline]
-    pub fn coin_trade_active(&self, symbol: &CoinSymbol) -> bool {
-        self.coins.get(symbol).unwrap().active_trade
+    pub fn coin_trade_active(&self, symbol: CoinSymbol) -> bool {
+        self.coins.get(&symbol).unwrap().active_trade
     }
 
-    pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) {
+    pub async fn update_coin_position(
+        &mut self,
+        symbol: CoinSymbol,
+        high: f64,
+        atr: f64,
+        rsi: TradeSignal,
+    ) {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
-        if high > coin.rolling_stop_loss {
-            coin.rolling_stop_loss = high + atr;
-        } else {
+        if high - atr > coin.stop_loss {
+            coin.stop_loss = high - atr;
+        } else if rsi == TradeSignal::Sell {
             self.create_order(TradeSide::Sell, symbol, atr).await;
         }
     }
@@ -298,5 +299,10 @@ impl BotAccount {
             .unwrap();
 
         println!("{ans}");
+    }
+
+    pub fn get_coin(&self, symbol: CoinSymbol) {
+        let coin = self.coins.get(&symbol);
+        println!("{:?}", coin);
     }
 }
