@@ -119,3 +119,13 @@ pub fn insert_into_hashmap<T>(
         value,
     );
 }
+
+#[inline]
+pub fn get_api_string(symbol: CoinSymbol, currency: CoinSymbol, endpoint: &str) -> String {
+    format!(
+        "{}/{}-{}",
+        endpoint,
+        String::from(symbol),
+        String::from(currency)
+    )
+}

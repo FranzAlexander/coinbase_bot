@@ -6,12 +6,13 @@ use crate::{
     coin::{Coin, CoinSymbol},
     model::{
         account::{AccountList, Product},
+        event::{CoinbaseCandle, CoinbaseCandleEvent},
         fee::FeeData,
         order::OrderResponse,
         TradeSide,
     },
     trading_bot::TradeSignal,
-    util::{create_headers, send_get_request},
+    util::{create_headers, get_api_string, send_get_request},
 };
 
 pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
@@ -199,24 +200,14 @@ impl BotAccount {
     }
 
     async fn get_product(&self, symbol: CoinSymbol) -> Product {
-        let path = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
+        let path = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
         let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
-        let url = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
+        let url = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
 
         send_get_request::<Product>(&self.client, &url, headers)
             .await
             .expect("Failed to get product")
-    }
-
-    #[inline]
-    fn get_api_string(&self, symbol: CoinSymbol, currency: CoinSymbol, endpoint: &str) -> String {
-        format!(
-            "{}/{}-{}",
-            endpoint,
-            String::from(symbol),
-            String::from(currency)
-        )
     }
 
     #[inline]
@@ -280,33 +271,33 @@ impl BotAccount {
         }
     }
 
-    pub async fn get_product_candle(&self, symbol: CoinSymbol, start: i64, end: i64) {
-        let api_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
-
-        let path = format!("{}/{}", api_string, "candles");
-        let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
-        let url_string = self.get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
-        let url = format!(
-            "{}/candles?start={}&end={}&granularity={}",
-            url_string, start, end, "ONE_MINUTE"
-        );
-
-        let ans = self
-            .client
-            .get(url)
-            .headers(headers)
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap();
-
-        println!("{ans}");
-    }
-
     pub fn get_coin(&self, symbol: CoinSymbol) {
         let coin = self.coins.get(&symbol);
         println!("{:?}", coin);
     }
+}
+
+pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) -> Vec<CoinbaseCandle> {
+    let client = reqwest::blocking::Client::new();
+    let api_string = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
+    let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
+    let secret_key = std::env::var("API_SECRET").expect("API_KEY not found in environment");
+
+    let path = format!("{}/{}", api_string, "candles");
+    let headers = create_headers(secret_key.as_bytes(), &api_key, "GET", &path, "");
+    let url_string = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
+    let url = format!(
+        "{}/candles?start={}&end={}&granularity={}",
+        url_string, start, end, "ONE_MINUTE"
+    );
+
+    let ans: CoinbaseCandleEvent = client
+        .get(url)
+        .headers(headers)
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+
+    ans.candles
 }

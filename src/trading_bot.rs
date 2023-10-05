@@ -17,9 +17,9 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 // const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
 const MAX_CROSS_PERIOD: usize = 3;
-const MIN_CANDLE_PROCCESSED: usize = 26;
+const MIN_CANDLE_PROCCESSED: usize = 2;
 
-const ATR_MODIFIER: f64 = 0.25;
+const ATR_MODIFIER: f64 = 0.5;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {
@@ -178,6 +178,10 @@ impl TradingBot {
     }
 
     pub fn get_atr_value(&self) -> Option<f64> {
-        self.atr.get_atr().map(|atr| atr * ATR_MODIFIER)
+        if let Some(atr) = self.atr.get_atr() {
+            Some(atr * ATR_MODIFIER)
+        } else {
+            None
+        }
     }
 }

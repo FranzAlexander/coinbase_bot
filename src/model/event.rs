@@ -99,7 +99,22 @@ pub struct Order {
     pub order_type: String, // Can be one of: Limit, Market, Stop Limit
 }
 
-pub struct PriceUpdates {
-    pub send: bool,
-    pub symbol: String,
+#[derive(Debug, Deserialize, Clone)]
+pub struct CoinbaseCandleEvent {
+    pub candles: Vec<CoinbaseCandle>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CoinbaseCandle {
+    pub start: String,
+    #[serde(with = "string_or_float")]
+    pub low: f64,
+    #[serde(with = "string_or_float")]
+    pub high: f64,
+    #[serde(with = "string_or_float")]
+    pub open: f64,
+    #[serde(with = "string_or_float")]
+    pub close: f64,
+    #[serde(with = "string_or_float")]
+    pub volume: f64,
 }

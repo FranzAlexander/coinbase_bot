@@ -6,9 +6,9 @@ use std::{
     },
 };
 
-use account::{BotAccount, WS_URL};
+use account::{get_product_candle, BotAccount, WS_URL};
 use candlestick::{get_start_time, Candlestick};
-use chrono::Utc;
+use chrono::{DateTime, Duration, Timelike, Utc};
 use coin::CoinSymbol;
 use futures::StreamExt;
 use model::{
@@ -208,6 +208,21 @@ fn run_indicator(
                             .collect();
 
                         if let Some(&first_trade) = valid_trades.last() {
+                            let end = first_trade.time;
+                            let start = first_trade.time - Duration::minutes(100);
+                            let his_candles = get_product_candle(
+                                trades_msg.symbol,
+                                start.timestamp(),
+                                end.timestamp(),
+                            );
+
+                            for candle in his_candles.iter().rev() {
+                                indicator_bot.0.one_minute_update(Candlestick::new(
+                                    Utc::now(),
+                                    candle.close,
+                                    candle.volume,
+                                ));
+                            }
                             indicator_bot.1 = Candlestick::new(
                                 first_trade.time,
                                 first_trade.price,
@@ -240,7 +255,7 @@ fn run_indicator(
                             } else {
                                 indicator_bot.0.one_minute_update(indicator_bot.1);
                                 println!("Candle: {}", indicator_bot.1);
-                                println!("ATR: {:?}", indicator_bot.0.get_atr_value());
+                                println!("ATR: {:0.10}", indicator_bot.0.get_atr_value().unwrap());
                                 let signal =
                                     indicator_bot.0.get_signal(IndicatorTimeframe::OneMinute);
                                 let atr = indicator_bot.0.get_atr_value();
@@ -274,7 +289,11 @@ async fn run_bot_account(
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
-    // bot_account.get_product_candle().await;
+    // let end = get_start_time(&Utc::now());
+    // let start = end - Duration::minutes(100);
+    // bot_account
+    //     .get_product_candle(CoinSymbol::Xrp, start.timestamp(), end.timestamp())
+    //     .await;
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
