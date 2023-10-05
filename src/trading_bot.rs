@@ -19,7 +19,7 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 const MAX_CROSS_PERIOD: usize = 3;
 const MIN_CANDLE_PROCCESSED: usize = 2;
 
-const ATR_MODIFIER: f64 = 1.25;
+const ATR_MODIFIER: f64 = 1.0;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {

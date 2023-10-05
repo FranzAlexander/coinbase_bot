@@ -52,19 +52,22 @@ pub struct Coin {
     pub balance: f64,
     pub active_trade: bool,
     pub stop_loss: f64,
+    pub last_high: f64,
 }
 
 impl Coin {
-    pub fn new(balance: f64, active_trade: bool, stop_loss: f64) -> Self {
+    pub fn new(balance: f64, active_trade: bool, stop_loss: f64, last_high: f64) -> Self {
         Coin {
             balance,
             active_trade,
             stop_loss,
+            last_high,
         }
     }
 
-    pub fn update_coin(&mut self, active_trade: bool, stop_loss: f64) {
+    pub fn update_coin(&mut self, active_trade: bool, stop_loss: f64, last_high: f64) {
         self.active_trade = active_trade;
         self.stop_loss = stop_loss;
+        self.last_high = last_high;
     }
 }

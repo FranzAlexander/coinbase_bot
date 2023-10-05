@@ -88,6 +88,7 @@ impl BotAccount {
                         account.available_balance.value,
                         false,
                         0.0,
+                        0.0,
                     ));
                 }
                 CoinSymbol::Unknown => (),
@@ -123,7 +124,13 @@ impl BotAccount {
             .expect("Failed to send get request!")
     }
 
-    pub async fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
+    pub async fn create_order(
+        &mut self,
+        order_type: TradeSide,
+        symbol: CoinSymbol,
+        atr: f64,
+        high: f64,
+    ) {
         let price = self.get_product(symbol).await;
         let client_order_id = Uuid::new_v4().to_string();
 
@@ -192,9 +199,9 @@ impl BotAccount {
                 TradeSide::Buy => {
                     let new_price = price.price - atr;
 
-                    coin.update_coin(true, new_price);
+                    coin.update_coin(true, new_price, high);
                 }
-                TradeSide::Sell => coin.update_coin(false, 0.0),
+                TradeSide::Sell => coin.update_coin(false, 0.0, 0.0),
             }
         }
     }
@@ -254,14 +261,16 @@ impl BotAccount {
     pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) -> bool {
         let coin = self.coins.get_mut(&symbol).unwrap();
 
-        if high - atr > coin.stop_loss {
+        if high > coin.last_high {
+            coin.last_high = high;
             coin.stop_loss = high - atr;
-            true
-        } else {
-            self.create_order(TradeSide::Sell, symbol, atr).await;
-
-            false
         }
+
+        if high <= coin.stop_loss {
+            return true;
+            // self.create_order(TradeSide::Sell, symbol, atr, high).await;
+        }
+        false
     }
 
     pub fn get_coin(&self, symbol: CoinSymbol) {
