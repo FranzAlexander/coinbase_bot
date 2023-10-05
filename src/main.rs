@@ -16,7 +16,10 @@ use model::{
     TradeSide,
 };
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
     task::spawn_blocking,
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -48,10 +51,21 @@ async fn main() -> anyhow::Result<()> {
     let (indicator_tx, indicator_rx) = mpsc::channel::<IndicatorChannelMessage>(200);
     let (account_tx, account_rx) = mpsc::channel::<AccountChannelMessage>(200);
 
+    let position_open = Arc::new(Mutex::new(false));
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    launch_processing_tasks(indicator_rx, account_tx.clone(), keep_running.clone());
-    launch_websocket_tasks(indicator_tx, account_rx, keep_running.clone());
+    launch_processing_tasks(
+        indicator_rx,
+        account_tx.clone(),
+        keep_running.clone(),
+        position_open.clone(),
+    );
+    launch_websocket_tasks(
+        indicator_tx,
+        account_rx,
+        keep_running.clone(),
+        position_open.clone(),
+    );
 
     tokio::signal::ctrl_c().await?;
     info!("Received shutdown signal. Gracefully terminating...");
@@ -71,10 +85,13 @@ fn launch_websocket_tasks(
     indicator_tx: Sender<IndicatorChannelMessage>,
     mut account_rx: Receiver<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
+    position_open: Arc<Mutex<bool>>,
 ) {
     let bot_account_keep_running = keep_running.clone();
 
-    tokio::spawn(async move { run_bot_account(&mut account_rx, bot_account_keep_running).await });
+    tokio::spawn(async move {
+        run_bot_account(&mut account_rx, bot_account_keep_running, position_open).await
+    });
 
     let symbols = [CoinSymbol::Xrp];
 
@@ -94,8 +111,11 @@ fn launch_processing_tasks(
     mut indicator_rx: Receiver<IndicatorChannelMessage>,
     account_tx: Sender<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
+    position_open: Arc<Mutex<bool>>,
 ) {
-    spawn_blocking(move || run_indicator(&mut indicator_rx, account_tx, keep_running));
+    spawn_blocking(move || {
+        run_indicator(&mut indicator_rx, account_tx, keep_running, position_open)
+    });
 }
 
 async fn run_websocket(
@@ -161,6 +181,7 @@ fn run_indicator(
     indicator_rx: &mut Receiver<IndicatorChannelMessage>,
     account_tx: Sender<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
+    position_open: Arc<Mutex<bool>>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, (TradingBot, Candlestick)> = HashMap::new();
     let symbols = [CoinSymbol::Xrp];
@@ -199,17 +220,20 @@ fn run_indicator(
                         }
                     } else {
                         for trade in market_trades.trades.iter().rev() {
-                            if indicator_bot.0.get_macd_signal() == TradeSignal::Buy {
-                                let atr = indicator_bot.0.get_atr_value();
-                                let _ = account_tx.blocking_send(AccountChannelMessage {
-                                    timeframe: IndicatorTimeframe::PerTrade,
-                                    symbol: trades_msg.symbol,
-                                    start: 0,
-                                    end: 0,
-                                    signal: indicator_bot.0.get_rsi_signal(),
-                                    high: trade.price,
-                                    atr,
-                                });
+                            {
+                                let locked_position = position_open.blocking_lock();
+                                if *locked_position {
+                                    let atr = indicator_bot.0.get_atr_value();
+                                    let _ = account_tx.blocking_send(AccountChannelMessage {
+                                        timeframe: IndicatorTimeframe::PerTrade,
+                                        symbol: trades_msg.symbol,
+                                        start: 0,
+                                        end: 0,
+                                        signal: indicator_bot.0.get_rsi_signal(),
+                                        high: trade.price,
+                                        atr,
+                                    });
+                                }
                             }
                             if trade.time < indicator_bot.1.end {
                                 indicator_bot.1.update(trade.price, trade.size);
@@ -245,6 +269,7 @@ fn run_indicator(
 async fn run_bot_account(
     account_rx: &mut Receiver<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
+    position_open: Arc<Mutex<bool>>,
 ) {
     let mut bot_account = BotAccount::new();
 
@@ -256,7 +281,8 @@ async fn run_bot_account(
             if account_msg.timeframe == IndicatorTimeframe::PerTrade
                 && bot_account.coin_trade_active(account_msg.symbol)
             {
-                bot_account
+                let mut locked = position_open.lock().await;
+                *locked = bot_account
                     .update_coin_position(
                         account_msg.symbol,
                         account_msg.high,
@@ -269,11 +295,17 @@ async fn run_bot_account(
             if account_msg.timeframe == IndicatorTimeframe::OneMinute
                 && !bot_account.coin_trade_active(account_msg.symbol)
             {
-                bot_account
-                    .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
-                    .await;
-                bot_account.update_balances().await;
-                bot_account.get_coin(account_msg.symbol);
+                if account_msg.signal == TradeSignal::Buy {
+                    bot_account
+                        .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
+                        .await;
+                    bot_account.update_balances().await;
+                    bot_account.get_coin(account_msg.symbol);
+                    {
+                        let mut locked = position_open.lock().await;
+                        *locked = true;
+                    }
+                }
             }
         }
     }
