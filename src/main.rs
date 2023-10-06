@@ -275,6 +275,8 @@ async fn run_bot_account(
 
     bot_account.update_balances().await;
 
+    println!("{:?}", bot_account);
+
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
             if bot_account.coin_trade_active(account_msg.symbol).await {

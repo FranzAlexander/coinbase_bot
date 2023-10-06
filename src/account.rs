@@ -189,7 +189,7 @@ impl BotAccount {
                     count += 1;
                 }
             }
-            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / count as f64
+            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / (count - 2) as f64
         } else {
             let locked_coins = self.coins.lock().await;
             locked_coins.get(&symbol).unwrap().balance
@@ -213,12 +213,9 @@ impl BotAccount {
     fn is_valid_coin(&self, coin_symbol: &CoinSymbol) -> bool {
         matches!(
             coin_symbol,
-            CoinSymbol::Ada // | CoinSymbol::Link
-                            // | CoinSymbol::Usd
-                            // | CoinSymbol::Usdc
-                            // | CoinSymbol::Xrp
-                            // | CoinSymbol::Btc
-                            // | CoinSymbol::Eth
+            // CoinSymbol::Ada // | CoinSymbol::Link
+            |CoinSymbol::Usd| CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
+                                                                 // | CoinSymbol::Eth
         )
     }
 
