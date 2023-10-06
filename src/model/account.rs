@@ -45,6 +45,15 @@ pub struct Balance {
 
 #[derive(Debug, Deserialize)]
 pub struct Product {
+    pub product_id: String,
     #[serde(with = "string_or_float")]
     pub price: f64,
+    #[serde(with = "string_or_float")]
+    pub quote_min_size: f64,
+    #[serde(with = "string_or_float")]
+    pub quote_max_size: f64,
+    #[serde(with = "string_or_float")]
+    pub base_min_size: f64,
+    #[serde(with = "string_or_float")]
+    pub base_max_size: f64,
 }

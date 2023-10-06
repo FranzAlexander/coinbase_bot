@@ -206,7 +206,7 @@ impl BotAccount {
         }
     }
 
-    async fn get_product(&self, symbol: CoinSymbol) -> Product {
+    pub async fn get_product(&self, symbol: CoinSymbol) -> Product {
         let path = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
         let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");

@@ -274,6 +274,8 @@ async fn run_bot_account(
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
+    let product = bot_account.get_product(CoinSymbol::Btc).await;
+    info!("{:?}", product);
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
