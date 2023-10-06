@@ -223,12 +223,8 @@ impl BotAccount {
     }
 
     #[inline]
-    pub fn coin_trade_active(&self, symbol: CoinSymbol) -> bool {
-        self.coins
-            .blocking_lock()
-            .get(&symbol)
-            .unwrap()
-            .active_trade
+    pub async fn coin_trade_active(&self, symbol: CoinSymbol) -> bool {
+        self.coins.lock().await.get(&symbol).unwrap().active_trade
     }
 
     pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) -> bool {

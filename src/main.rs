@@ -277,7 +277,7 @@ async fn run_bot_account(
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
-            if bot_account.coin_trade_active(account_msg.symbol) {
+            if bot_account.coin_trade_active(account_msg.symbol).await {
                 let sell = bot_account
                     .update_coin_position(
                         account_msg.symbol,
@@ -297,7 +297,7 @@ async fn run_bot_account(
                 }
             }
             if account_msg.timeframe == IndicatorTimeframe::OneMinute
-                && !bot_account.coin_trade_active(account_msg.symbol)
+                && !bot_account.coin_trade_active(account_msg.symbol).await
             {
                 if account_msg.signal == TradeSignal::Buy {
                     bot_account
