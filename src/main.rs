@@ -274,8 +274,6 @@ async fn run_bot_account(
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
-    let product = bot_account.get_product(CoinSymbol::Btc).await;
-    info!("{:?}", product);
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
@@ -294,7 +292,6 @@ async fn run_bot_account(
                             TradeSide::Sell,
                             account_msg.symbol,
                             account_msg.atr.unwrap(),
-                            account_msg.high,
                         )
                         .await;
                 }
@@ -304,21 +301,52 @@ async fn run_bot_account(
             {
                 if account_msg.signal == TradeSignal::Buy {
                     bot_account
-                        .create_order(
-                            TradeSide::Buy,
-                            account_msg.symbol,
-                            account_msg.atr.unwrap(),
-                            account_msg.high,
-                        )
+                        .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
                         .await;
                     bot_account.update_balances().await;
-                    bot_account.get_coin(account_msg.symbol);
-                    {
-                        let mut locked = position_open.lock().await;
-                        *locked = true;
-                    }
                 }
             }
+
+            // if bot_account.coin_trade_active(account_msg.symbol) {
+            //     let sell = bot_account
+            //         .update_coin_position(
+            //             account_msg.symbol,
+            //             account_msg.high,
+            //             account_msg.atr.unwrap(),
+            //         )
+            //         .await;
+
+            //     if sell {
+            //         bot_account
+            //             .create_order(
+            //                 TradeSide::Sell,
+            //                 account_msg.symbol,
+            //                 account_msg.atr.unwrap(),
+            //                 account_msg.high,
+            //             )
+            //             .await;
+            //     }
+            // }
+            // if account_msg.timeframe == IndicatorTimeframe::OneMinute
+            //     && !bot_account.coin_trade_active(account_msg.symbol)
+            // {
+            //     if account_msg.signal == TradeSignal::Buy {
+            //         bot_account
+            //             .create_order(
+            //                 TradeSide::Buy,
+            //                 account_msg.symbol,
+            //                 account_msg.atr.unwrap(),
+            //                 account_msg.high,
+            //             )
+            //             .await;
+            //         bot_account.update_balances().await;
+            //         bot_account.get_coin(account_msg.symbol);
+            //         {
+            //             let mut locked = position_open.lock().await;
+            //             *locked = true;
+            //         }
+            //     }
+            // }
         }
     }
 }

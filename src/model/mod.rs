@@ -8,7 +8,7 @@ pub mod event;
 pub mod fee;
 pub mod order;
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TradeSide {
     Buy,
