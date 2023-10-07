@@ -46,6 +46,8 @@ struct GoodsAndServicesTax {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TaxType {
-    INCLUSIVE,
-    EXCLUSIVE,
+    #[serde(rename = "INCLUSIVE")]
+    Inclusive,
+    #[serde(rename = "EXCLUSIVE")]
+    Exclusive,
 }

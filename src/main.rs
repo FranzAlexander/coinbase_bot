@@ -8,7 +8,7 @@ use std::{
 
 use account::{get_product_candle, BotAccount, WS_URL};
 use candlestick::{get_start_time, Candlestick};
-use chrono::{DateTime, Duration, Timelike, Utc};
+use chrono::{Duration, Utc};
 use coin::CoinSymbol;
 use futures::StreamExt;
 use model::{
@@ -24,7 +24,7 @@ use tokio::{
 };
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{error, event, info, Level};
-use trading_bot::{TradeSignal, TradingBot};
+use trading_bot::{IndicatorGroup, TradeSignal, TradingBot};
 use util::market_subcribe_string;
 
 use crate::{
@@ -181,15 +181,19 @@ fn run_indicator(
     indicator_rx: &mut Receiver<IndicatorChannelMessage>,
     account_tx: Sender<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
-    position_open: Arc<Mutex<bool>>,
+    _position_open: Arc<Mutex<bool>>,
 ) {
-    let mut trading_indicators: HashMap<CoinSymbol, (TradingBot, Candlestick)> = HashMap::new();
+    let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
     let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(
             symbol,
-            (TradingBot::new(), Candlestick::new(Utc::now(), 0.0, 0.0)),
+            IndicatorGroup {
+                trading_bot: TradingBot::new(),
+                candle: Candlestick::new(Utc::now(), 0.0, 0.0),
+                initialise: true,
+            },
         );
     }
 
@@ -199,7 +203,7 @@ fn run_indicator(
                 for market_trades in trades_msg.trades {
                     // This runs when we first conncet to the websocket to get inital candle,
                     // the candle my not be finished in the snapshot.
-                    if market_trades.event_type == EventType::Snapshot {
+                    if market_trades.event_type == EventType::Snapshot && indicator_bot.initialise {
                         let first_trade_time = get_start_time(&market_trades.trades[0].time);
                         let valid_trades: Vec<&MarketTrade> = market_trades
                             .trades
@@ -217,43 +221,49 @@ fn run_indicator(
                             );
 
                             for candle in his_candles.iter().rev() {
-                                indicator_bot.0.one_minute_update(Candlestick::new(
-                                    Utc::now(),
-                                    candle.close,
-                                    candle.volume,
-                                ));
+                                indicator_bot
+                                    .trading_bot
+                                    .one_minute_update(Candlestick::new(
+                                        Utc::now(),
+                                        candle.close,
+                                        candle.volume,
+                                    ));
                             }
-                            indicator_bot.1 = Candlestick::new(
+                            indicator_bot.candle = Candlestick::new(
                                 first_trade.time,
                                 first_trade.price,
                                 first_trade.size,
                             );
 
                             for &trade in valid_trades.iter().rev().skip(1) {
-                                indicator_bot.1.update(trade.price, trade.size);
+                                indicator_bot.candle.update(trade.price, trade.size);
                             }
+
+                            indicator_bot.initialise = false;
                         }
                     } else {
                         for trade in market_trades.trades.iter().rev() {
-                            if trade.time < indicator_bot.1.end {
-                                indicator_bot.1.update(trade.price, trade.size);
+                            if trade.time < indicator_bot.candle.end {
+                                indicator_bot.candle.update(trade.price, trade.size);
                             } else {
-                                indicator_bot.0.one_minute_update(indicator_bot.1);
-                                println!("Candle: {}", indicator_bot.1);
-                                println!("ATR: {:0.10}", indicator_bot.0.get_atr_value().unwrap());
-                                let signal =
-                                    indicator_bot.0.get_signal(IndicatorTimeframe::OneMinute);
-                                let atr = indicator_bot.0.get_atr_value();
+                                indicator_bot
+                                    .trading_bot
+                                    .one_minute_update(indicator_bot.candle);
+                                println!("Candle: {}", indicator_bot.candle);
+                                let signal = indicator_bot
+                                    .trading_bot
+                                    .get_signal(IndicatorTimeframe::OneMinute);
+                                let atr = indicator_bot.trading_bot.get_atr_value();
                                 let _ = account_tx.blocking_send(AccountChannelMessage {
                                     timeframe: IndicatorTimeframe::OneMinute,
                                     symbol: trades_msg.symbol,
-                                    start: indicator_bot.1.start.timestamp(),
-                                    end: indicator_bot.1.end.timestamp(),
+                                    start: indicator_bot.candle.start.timestamp(),
+                                    end: indicator_bot.candle.end.timestamp(),
                                     signal,
-                                    high: indicator_bot.1.high,
+                                    high: indicator_bot.candle.high,
                                     atr,
                                 });
-                                indicator_bot.1 =
+                                indicator_bot.candle =
                                     Candlestick::new(trade.time, trade.price, trade.size);
                             }
                         }
@@ -269,18 +279,14 @@ fn run_indicator(
 async fn run_bot_account(
     account_rx: &mut Receiver<AccountChannelMessage>,
     keep_running: Arc<AtomicBool>,
-    position_open: Arc<Mutex<bool>>,
+    _position_open: Arc<Mutex<bool>>,
 ) {
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
-    bot_account
-        .create_order(TradeSide::Buy, CoinSymbol::Xrp, 0.001000)
-        .await;
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
-            info!("Signal: {:?}", account_msg.signal);
             if bot_account.coin_trade_active(account_msg.symbol).await {
                 let sell = bot_account
                     .update_coin_position(
@@ -302,55 +308,13 @@ async fn run_bot_account(
             }
             if account_msg.timeframe == IndicatorTimeframe::OneMinute
                 && !bot_account.coin_trade_active(account_msg.symbol).await
+                && account_msg.signal == TradeSignal::Buy
             {
-                if account_msg.signal == TradeSignal::Buy {
-                    bot_account
-                        .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
-                        .await;
-                    bot_account.update_balances().await;
-                }
+                bot_account
+                    .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
+                    .await;
+                bot_account.update_balances().await;
             }
-
-            // if bot_account.coin_trade_active(account_msg.symbol) {
-            //     let sell = bot_account
-            //         .update_coin_position(
-            //             account_msg.symbol,
-            //             account_msg.high,
-            //             account_msg.atr.unwrap(),
-            //         )
-            //         .await;
-
-            //     if sell {
-            //         bot_account
-            //             .create_order(
-            //                 TradeSide::Sell,
-            //                 account_msg.symbol,
-            //                 account_msg.atr.unwrap(),
-            //                 account_msg.high,
-            //             )
-            //             .await;
-            //     }
-            // }
-            // if account_msg.timeframe == IndicatorTimeframe::OneMinute
-            //     && !bot_account.coin_trade_active(account_msg.symbol)
-            // {
-            //     if account_msg.signal == TradeSignal::Buy {
-            //         bot_account
-            //             .create_order(
-            //                 TradeSide::Buy,
-            //                 account_msg.symbol,
-            //                 account_msg.atr.unwrap(),
-            //                 account_msg.high,
-            //             )
-            //             .await;
-            //         bot_account.update_balances().await;
-            //         bot_account.get_coin(account_msg.symbol);
-            //         {
-            //             let mut locked = position_open.lock().await;
-            //             *locked = true;
-            //         }
-            //     }
-            // }
         }
     }
 }

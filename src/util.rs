@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use futures::SinkExt;
 use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
@@ -106,18 +104,6 @@ pub fn create_headers(
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
     headers
-}
-
-pub fn insert_into_hashmap<T>(
-    hashmap: &mut HashMap<String, T>,
-    symbol: CoinSymbol,
-    curreny_sybmol: CoinSymbol,
-    value: T,
-) {
-    hashmap.insert(
-        format!("{}-{}", String::from(symbol), String::from(curreny_sybmol)),
-        value,
-    );
 }
 
 #[inline]

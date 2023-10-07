@@ -27,11 +27,13 @@ pub enum Event {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct SubscriptionDetail {
     heartbeats: Option<Vec<String>>,
     market_trades: Option<Vec<String>>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct SubscriptionEvent {
     subscriptions: SubscriptionDetail,
@@ -61,6 +63,7 @@ pub struct MarketTradeEvent {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct MarketTrade {
     #[serde(with = "string_or_i64")]
     trade_id: i64,

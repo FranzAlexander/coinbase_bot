@@ -23,11 +23,11 @@ const ATR_MODIFIER: f64 = 1.0;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {
-    PerTrade,
     OneMinute,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct TradingIndicator {
     timeframe: IndicatorTimeframe,
     macd: Macd,
@@ -76,10 +76,6 @@ impl TradingIndicator {
         } else {
             TradeSignal::Hold
         }
-    }
-
-    pub fn get_rsi(&self) -> Option<f64> {
-        self.rsi.get_current_rsi()
     }
 }
 
@@ -139,10 +135,6 @@ impl TradingBot {
         }
     }
 
-    pub fn get_macd_signal(&self) -> TradeSignal {
-        self.long_trading.get_macd_signal()
-    }
-
     pub fn check_rsi_signal(&mut self) -> TradeSignal {
         let buy_signal = self.latest_rsi_signals.contains(&TradeSignal::Buy);
         if buy_signal {
@@ -150,38 +142,15 @@ impl TradingBot {
         } else {
             *self.latest_rsi_signals.back().unwrap()
         }
-        // let current_signal = self.long_trading.get_rsi_signal();
-
-        // if current_signal == self.last_rsi_cross {
-        //     self.since_last_cross += 1;
-        //     if self.since_last_cross > MAX_CROSS_PERIOD - 1 {
-        //         if let Some(rsi) = self.long_trading.get_rsi() {
-        //             if rsi <= RSI_CROSS_BUY_CHECK {
-        //                 self.last_rsi_cross = current_signal;
-        //             }
-        //         }
-        //     } else if self.since_last_cross > MAX_CROSS_PERIOD {
-        //         self.last_rsi_cross = TradeSignal::Hold;
-        //     } else {
-        //         self.last_rsi_cross = current_signal;
-        //     }
-        // } else {
-        //     self.since_last_cross = 0;
-        //     self.last_rsi_cross = current_signal;
-        // }
-
-        // self.last_rsi_cross
-    }
-
-    pub fn get_rsi_signal(&self) -> TradeSignal {
-        self.long_trading.get_rsi_signal()
     }
 
     pub fn get_atr_value(&self) -> Option<f64> {
-        if let Some(atr) = self.atr.get_atr() {
-            Some(atr * ATR_MODIFIER)
-        } else {
-            None
-        }
+        self.atr.get_atr().map(|atr| atr * ATR_MODIFIER)
     }
+}
+
+pub struct IndicatorGroup {
+    pub trading_bot: TradingBot,
+    pub candle: Candlestick,
+    pub initialise: bool,
 }

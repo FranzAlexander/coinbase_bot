@@ -20,12 +20,12 @@ pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
-const SUMMARY_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/transaction_summary";
+// const SUMMARY_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/transaction_summary";
 
 const PRODUCT_REQUEST_PATH: &str = "/api/v3/brokerage/products";
 const ACCOUNT_REQUEST_PATH: &str = "/api/v3/brokerage/accounts";
 const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
-const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
+// const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
 #[derive(Debug)]
 pub struct BotAccount {

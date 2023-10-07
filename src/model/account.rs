@@ -3,12 +3,15 @@ use serde::{Deserialize, Serialize};
 use super::string_or_float;
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AccountType {
-    AccountTypeUnspecified,
-    AccountTypeCrypto,
-    AccountTypeFiat,
-    AccountTypeVault,
+    #[serde(rename = "ACCOUNT_TYPE_UNSPECIFIED")]
+    Unspecified,
+    #[serde(rename = "ACCOUNT_TYPE_CRYPTO")]
+    Crypto,
+    #[serde(rename = "ACCOUNT_TYPE_FIAT")]
+    Fiat,
+    #[serde(rename = "ACCOUNT_TYPE_VAULT")]
+    Vault,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

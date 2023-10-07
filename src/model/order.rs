@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use super::{string_or_float, OrderStatus}; // I assume you're using the 'uuid' crate
+use super::string_or_float; // I assume you're using the 'uuid' crate
 
+#[allow(dead_code)]
 pub enum TradeOrderType {
     Market,
     Limit,
