@@ -287,6 +287,7 @@ async fn run_bot_account(
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
+            info!("CURRENT SIGNAL: {:?}", account_msg.signal);
             if bot_account.coin_trade_active(account_msg.symbol).await {
                 let sell = bot_account
                     .update_coin_position(
