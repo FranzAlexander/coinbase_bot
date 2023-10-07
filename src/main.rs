@@ -274,11 +274,13 @@ async fn run_bot_account(
     let mut bot_account = BotAccount::new();
 
     bot_account.update_balances().await;
-
-    println!("{:?}", bot_account);
+    bot_account
+        .create_order(TradeSide::Buy, CoinSymbol::Xrp, 0.001000)
+        .await;
 
     while keep_running.load(Ordering::Relaxed) {
         while let Some(account_msg) = account_rx.recv().await {
+            info!("Signal: {:?}", account_msg.signal);
             if bot_account.coin_trade_active(account_msg.symbol).await {
                 let sell = bot_account
                     .update_coin_position(

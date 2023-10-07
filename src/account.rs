@@ -189,7 +189,7 @@ impl BotAccount {
                     count += 1;
                 }
             }
-            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / (count - 2) as f64
+            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / count as f64
         } else {
             let locked_coins = self.coins.lock().await;
             locked_coins.get(&symbol).unwrap().balance
