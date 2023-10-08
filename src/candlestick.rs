@@ -3,7 +3,10 @@ use std::fmt;
 use chrono::{DateTime, Duration, Timelike, Utc};
 use serde::Deserialize;
 
-pub const CANDLESTICK_TIMEFRAME: i64 = 60;
+use crate::trading_bot::IndicatorTimeframe;
+
+pub const CANDLESTICK_ONE_MIN_TIMEFRAME: i64 = 60;
+pub const CANDLESTICK_FIVE_MIN_TIMEFRAME: i64 = 300;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CandlestickMessage {
@@ -23,9 +26,16 @@ pub struct Candlestick {
 }
 
 impl Candlestick {
-    pub fn new(time: DateTime<Utc>, price: f64, size: f64) -> Self {
+    pub fn new(time: DateTime<Utc>, price: f64, size: f64, timeframe: IndicatorTimeframe) -> Self {
         let start = get_start_time(&time);
-        let end = start + Duration::seconds(CANDLESTICK_TIMEFRAME);
+        let mut time_f = 0;
+        if timeframe == IndicatorTimeframe::OneMinute {
+            time_f = CANDLESTICK_ONE_MIN_TIMEFRAME;
+        }
+        if timeframe == IndicatorTimeframe::FiveMinute {
+            time_f = CANDLESTICK_FIVE_MIN_TIMEFRAME;
+        }
+        let end = start + Duration::seconds(time_f);
         Candlestick {
             start,
             end,

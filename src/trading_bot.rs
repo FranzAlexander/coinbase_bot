@@ -26,6 +26,7 @@ const ATR_MODIFIER: f64 = 1.0;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {
     OneMinute,
+    FiveMinute,
 }
 
 #[derive(Debug)]
@@ -152,6 +153,7 @@ impl TradingBot {
 }
 
 pub struct IndicatorGroup {
+    pub timeframe: IndicatorTimeframe,
     pub trading_bot: TradingBot,
     pub candle: Candlestick,
     pub initialise: bool,

@@ -12,6 +12,7 @@ use crate::{
         order::OrderResponse,
         TradeSide,
     },
+    trading_bot::IndicatorTimeframe,
     util::{create_headers, get_api_string, send_get_request},
 };
 
@@ -258,18 +259,32 @@ impl BotAccount {
     }
 }
 
-pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) -> Vec<CoinbaseCandle> {
+pub fn get_product_candle(
+    symbol: CoinSymbol,
+    start: i64,
+    end: i64,
+    timeframe: IndicatorTimeframe,
+) -> Vec<CoinbaseCandle> {
     let client = reqwest::blocking::Client::new();
     let api_string = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
     let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
     let secret_key = std::env::var("API_SECRET").expect("API_KEY not found in environment");
+
+    let mut time_f = "";
+
+    if timeframe == IndicatorTimeframe::OneMinute {
+        time_f = "ONE_MINUTE"
+    }
+    if timeframe == IndicatorTimeframe::FiveMinute {
+        time_f = "FIVE_MINUTE"
+    }
 
     let path = format!("{}/{}", api_string, "candles");
     let headers = create_headers(secret_key.as_bytes(), &api_key, "GET", &path, "");
     let url_string = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
     let url = format!(
         "{}/candles?start={}&end={}&granularity={}",
-        url_string, start, end, "ONE_MINUTE"
+        url_string, start, end, time_f
     );
 
     let ans: CoinbaseCandleEvent = client

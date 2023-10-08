@@ -184,14 +184,18 @@ fn run_indicator(
     _position_open: Arc<Mutex<bool>>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Link];
+    let symbols = [
+        (CoinSymbol::Xrp, IndicatorTimeframe::OneMinute),
+        (CoinSymbol::Link, IndicatorTimeframe::FiveMinute),
+    ];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(
-            symbol,
+            symbol.0,
             IndicatorGroup {
+                timeframe: symbol.1,
                 trading_bot: TradingBot::new(),
-                candle: Candlestick::new(Utc::now(), 0.0, 0.0),
+                candle: Candlestick::new(Utc::now(), 0.0, 0.0, symbol.1),
                 initialise: true,
             },
         );
@@ -218,6 +222,7 @@ fn run_indicator(
                                 trades_msg.symbol,
                                 start.timestamp(),
                                 end.timestamp(),
+                                indicator_bot.timeframe,
                             );
 
                             for candle in his_candles.iter().rev() {
@@ -227,12 +232,14 @@ fn run_indicator(
                                         Utc::now(),
                                         candle.close,
                                         candle.volume,
+                                        indicator_bot.timeframe,
                                     ));
                             }
                             indicator_bot.candle = Candlestick::new(
                                 first_trade.time,
                                 first_trade.price,
                                 first_trade.size,
+                                indicator_bot.timeframe,
                             );
 
                             for &trade in valid_trades.iter().rev().skip(1) {
@@ -255,7 +262,7 @@ fn run_indicator(
                                     .get_signal(IndicatorTimeframe::OneMinute);
                                 let atr = indicator_bot.trading_bot.get_atr_value();
                                 let _ = account_tx.blocking_send(AccountChannelMessage {
-                                    timeframe: IndicatorTimeframe::OneMinute,
+                                    timeframe: indicator_bot.timeframe,
                                     symbol: trades_msg.symbol,
                                     start: indicator_bot.candle.start.timestamp(),
                                     end: indicator_bot.candle.end.timestamp(),
@@ -263,8 +270,12 @@ fn run_indicator(
                                     high: indicator_bot.candle.high,
                                     atr,
                                 });
-                                indicator_bot.candle =
-                                    Candlestick::new(trade.time, trade.price, trade.size);
+                                indicator_bot.candle = Candlestick::new(
+                                    trade.time,
+                                    trade.price,
+                                    trade.size,
+                                    indicator_bot.timeframe,
+                                );
                             }
                         }
                     }
