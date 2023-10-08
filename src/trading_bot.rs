@@ -12,6 +12,8 @@ pub enum TradeSignal {
     Hold,
 }
 
+// Look into price action.
+
 const RSI_OVERSOLD: f64 = 40.0;
 const RSI_OVERBROUGHT: f64 = 60.0;
 // const RSI_CROSS_BUY_CHECK: f64 = 45.0;

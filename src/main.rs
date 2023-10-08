@@ -305,6 +305,7 @@ async fn run_bot_account(
                             account_msg.atr.unwrap(),
                         )
                         .await;
+                    bot_account.update_balances().await;
                 }
             }
             if account_msg.timeframe == IndicatorTimeframe::OneMinute

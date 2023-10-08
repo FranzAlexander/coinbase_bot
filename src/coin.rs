@@ -70,4 +70,8 @@ impl Coin {
         self.stop_loss = stop_loss;
         self.last_high = last_high;
     }
+
+    pub fn update_balance(&mut self, balance: f64) {
+        self.balance = balance;
+    }
 }

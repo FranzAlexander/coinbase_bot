@@ -59,12 +59,14 @@ impl BotAccount {
             let coin_symbol = self.map_currency_to_symbol(&account.available_balance.currency);
             if self.is_valid_coin(&coin_symbol) {
                 let mut locked_coins = self.coins.lock().await;
-                locked_coins.entry(coin_symbol).or_insert(Coin::new(
-                    account.available_balance.value,
-                    false,
-                    0.0,
-                    0.0,
-                ));
+                match locked_coins.entry(coin_symbol) {
+                    std::collections::hash_map::Entry::Vacant(e) => {
+                        e.insert(Coin::new(account.available_balance.value, false, 0.0, 0.0));
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut e) => {
+                        e.get_mut().update_balance(account.available_balance.value);
+                    }
+                }
             }
         }
     }
