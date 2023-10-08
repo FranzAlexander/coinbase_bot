@@ -177,7 +177,7 @@ impl BotAccount {
             TradeSide::Sell => (
                 None,
                 if symbol == CoinSymbol::Xrp {
-                    Some(format!("{:.6}", amount))
+                    Some(format!("{:.6}", (amount * 100.0).floor() / 100.0))
                 } else if symbol == CoinSymbol::Link {
                     Some(format!("{:.3}", amount))
                 } else {
@@ -221,8 +221,9 @@ impl BotAccount {
         matches!(
             coin_symbol,
             // CoinSymbol::Ada
-            CoinSymbol::Link | CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
-                                                                                    // | CoinSymbol::Eth
+            // CoinSymbol::Link
+            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
+                                                                 // | CoinSymbol::Eth
         )
     }
 
