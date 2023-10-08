@@ -165,8 +165,10 @@ impl BotAccount {
             TradeSide::Buy => (
                 if symbol == CoinSymbol::Xrp {
                     Some(format!("{:.4}", (amount * 100.0).floor() / 100.0))
-                } else {
+                } else if symbol == CoinSymbol::Link {
                     Some(format!("{:.3}", (amount * 100.0).floor() / 100.0))
+                } else {
+                    Some(format!("{:.3}", (amount * 100.0)))
                 },
                 None,
             ),
@@ -174,9 +176,11 @@ impl BotAccount {
             TradeSide::Sell => (
                 None,
                 if symbol == CoinSymbol::Xrp {
-                    Some(format!("{:.6}", (amount * 100.0).floor() / 100.0))
+                    Some(format!("{:.6}", amount))
+                } else if symbol == CoinSymbol::Link {
+                    Some(format!("{:.3}", amount))
                 } else {
-                    Some(format!("{:.3}", (amount * 100.0).floor() / 100.0))
+                    Some(format!("{:.3}", amount))
                 },
             ),
         }
@@ -191,7 +195,7 @@ impl BotAccount {
                     count += 1;
                 }
             }
-            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / count as f64
+            locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / (count - 1) as f64
         } else {
             let locked_coins = self.coins.lock().await;
             locked_coins.get(&symbol).unwrap().balance
@@ -215,9 +219,9 @@ impl BotAccount {
     fn is_valid_coin(&self, coin_symbol: &CoinSymbol) -> bool {
         matches!(
             coin_symbol,
-            // CoinSymbol::Ada // | CoinSymbol::Link
-            |CoinSymbol::Usd| CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
-                                                                 // | CoinSymbol::Eth
+            // CoinSymbol::Ada
+            CoinSymbol::Link | CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
+                                                                                    // | CoinSymbol::Eth
         )
     }
 
