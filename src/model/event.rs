@@ -2,7 +2,6 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use smallvec::SmallVec;
 use uuid::Uuid;
 
 use super::{string_or_float, string_or_i64, OrderStatus, TradeSide};
@@ -23,10 +22,8 @@ pub enum Event {
     Subscriptions(Vec<SubscriptionEvent>),
     #[serde(rename = "heartbeats")]
     Heartbeats(Vec<HeartbeatEvent>),
-    #[serde(rename = "market_trades")]
-    MarketTrades(SmallVec<[MarketTradeEvent; 1]>),
     #[serde(rename = "candles")]
-    Candle(SmallVec<[CoinbaseCandleEvent; 1]>),
+    Candle(Vec<CandleEvent>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -59,27 +56,6 @@ impl fmt::Display for HeartbeatEvent {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct MarketTradeEvent {
-    #[serde(rename = "type")]
-    pub event_type: EventType,
-    pub trades: SmallVec<[MarketTrade; 15]>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct MarketTrade {
-    #[serde(with = "string_or_i64")]
-    trade_id: i64,
-    pub product_id: String,
-    #[serde(with = "string_or_float")]
-    pub price: f64,
-    #[serde(with = "string_or_float")]
-    pub size: f64,
-    side: TradeSide,
-    pub time: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct UserEvent {
     #[serde(rename = "type")]
     pub event_type: String,
@@ -106,12 +82,14 @@ pub struct Order {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct CoinbaseCandleEvent {
-    pub candles: SmallVec<[CoinbaseCandle; 2]>,
+pub struct CandleEvent {
+    #[serde(rename = "type")]
+    pub event_type: EventType,
+    pub candles: Vec<Candlestick>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct CoinbaseCandle {
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub struct Candlestick {
     #[serde(with = "string_or_i64")]
     pub start: i64,
     #[serde(with = "string_or_float")]
@@ -124,4 +102,9 @@ pub struct CoinbaseCandle {
     pub close: f64,
     #[serde(with = "string_or_float")]
     pub volume: f64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CandleHistory {
+    pub candles: Vec<Candlestick>,
 }

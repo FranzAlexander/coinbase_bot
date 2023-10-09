@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
 use crate::{
-    candlestick::Candlestick,
     indicators::{atr::Atr, macd::Macd, rsi::Rsi},
+    model::event::Candlestick,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -23,30 +23,19 @@ const MIN_CANDLE_PROCCESSED: usize = 2;
 
 const ATR_MODIFIER: f64 = 1.5;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum IndicatorTimeframe {
-    OneMinute,
-    FiveMinute,
-}
-
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct TradingIndicator {
-    timeframe: IndicatorTimeframe,
     macd: Macd,
     rsi: Rsi,
 }
 
 impl TradingIndicator {
-    pub fn new(timeframe: IndicatorTimeframe) -> Self {
+    pub fn new() -> Self {
         let macd = Macd::new(12, 21, 9);
         let rsi = Rsi::new(14);
 
-        TradingIndicator {
-            timeframe,
-            macd,
-            rsi,
-        }
+        TradingIndicator { macd, rsi }
     }
 
     pub fn update(&mut self, current_price: f64) {
@@ -93,7 +82,7 @@ pub struct TradingBot {
 
 impl TradingBot {
     pub fn new() -> Self {
-        let long_trading = TradingIndicator::new(IndicatorTimeframe::OneMinute);
+        let long_trading = TradingIndicator::new();
         let atr = Atr::new(14);
 
         TradingBot {
@@ -121,29 +110,25 @@ impl TradingBot {
         }
     }
 
-    pub fn get_signal(&mut self, timeframe: IndicatorTimeframe) -> TradeSignal {
-        if timeframe == IndicatorTimeframe::OneMinute {
-            if self.count > MIN_CANDLE_PROCCESSED {
-                let rsi_signal = self.check_rsi_signal();
-                let macd_signal = self.long_trading.get_macd_signal();
-                if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
-                    if self.can_trade {
-                        self.can_trade = false;
-                    }
-                    return TradeSignal::Buy;
-                } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
-                    if !self.can_trade {
-                        self.can_trade = true;
-                    }
-                    return TradeSignal::Sell;
-                } else {
-                    return TradeSignal::Hold;
+    pub fn get_signal(&mut self) -> TradeSignal {
+        if self.count > MIN_CANDLE_PROCCESSED {
+            let rsi_signal = self.check_rsi_signal();
+            let macd_signal = self.long_trading.get_macd_signal();
+            if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
+                if self.can_trade {
+                    self.can_trade = false;
                 }
+                return TradeSignal::Buy;
+            } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
+                if !self.can_trade {
+                    self.can_trade = true;
+                }
+                return TradeSignal::Sell;
+            } else {
+                return TradeSignal::Hold;
             }
-            TradeSignal::Hold
-        } else {
-            TradeSignal::Hold
         }
+        TradeSignal::Hold
     }
 
     pub fn check_rsi_signal(&mut self) -> TradeSignal {
@@ -161,8 +146,7 @@ impl TradingBot {
 }
 
 pub struct IndicatorGroup {
-    pub timeframe: IndicatorTimeframe,
     pub trading_bot: TradingBot,
-    pub candle: Candlestick,
+    pub start: i64,
     pub initialise: bool,
 }

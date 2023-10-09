@@ -7,14 +7,10 @@ use std::{
 };
 
 use account::{get_product_candle, BotAccount, WS_URL};
-use candlestick::{get_start_time, Candlestick};
 use chrono::{Duration, Utc};
 use coin::CoinSymbol;
 use futures::StreamExt;
-use model::{
-    event::{EventType, MarketTrade},
-    TradeSide,
-};
+use model::{event::EventType, TradeSide};
 use tokio::{
     sync::{
         mpsc::{self, Receiver, Sender},
@@ -32,12 +28,10 @@ use crate::{
         channel::{AccountChannelMessage, IndicatorChannelMessage},
         event::Event,
     },
-    trading_bot::IndicatorTimeframe,
     util::subscribe,
 };
 
 mod account;
-mod candlestick;
 mod coin;
 mod indicators;
 mod model;
@@ -142,16 +136,21 @@ async fn run_websocket(
                                     Event::Heartbeats(heartbeat) => {
                                         info!("{:?}", heartbeat);
                                     }
-                                    Event::MarketTrades(market_trades) => {
+                                    // Event::MarketTrades(market_trades) => {
+                                    //     let _ = indicator_tx
+                                    //         .send(IndicatorChannelMessage {
+                                    //             symbol,
+                                    //             trades: market_trades,
+                                    //         })
+                                    //         .await;
+                                    // }
+                                    Event::Candle(candle) => {
                                         let _ = indicator_tx
                                             .send(IndicatorChannelMessage {
                                                 symbol,
-                                                trades: market_trades,
+                                                candles: candle,
                                             })
                                             .await;
-                                    }
-                                    Event::Candle(candle) => {
-                                        info!("{:?}", candle);
                                     }
                                 }
                             }
@@ -187,95 +186,49 @@ fn run_indicator(
     _position_open: Arc<Mutex<bool>>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
-    let symbols = [(CoinSymbol::Xrp, IndicatorTimeframe::OneMinute)];
+    let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(
-            symbol.0,
+            symbol,
             IndicatorGroup {
-                timeframe: symbol.1,
                 trading_bot: TradingBot::new(),
-                candle: Candlestick::new(Utc::now(), 0.0, 0.0, symbol.1),
+                start: 0,
                 initialise: true,
             },
         );
     }
 
     while keep_running.load(Ordering::Relaxed) {
-        if let Some(trades_msg) = indicator_rx.blocking_recv() {
-            if let Some(indicator_bot) = trading_indicators.get_mut(&trades_msg.symbol) {
-                for market_trades in trades_msg.trades {
-                    // This runs when we first conncet to the websocket to get inital candle,
-                    // the candle my not be finished in the snapshot.
-                    if market_trades.event_type == EventType::Snapshot && indicator_bot.initialise {
-                        let first_trade_time = get_start_time(&market_trades.trades[0].time);
-                        let valid_trades: Vec<&MarketTrade> = market_trades
-                            .trades
-                            .iter()
-                            .filter(|&trade| trade.time >= first_trade_time)
-                            .collect();
+        if let Some(message) = indicator_rx.blocking_recv() {
+            if let Some(indicator_bot) = trading_indicators.get_mut(&message.symbol) {
+                for candle_event in message.candles.iter() {
+                    if candle_event.event_type == EventType::Snapshot && indicator_bot.initialise {
+                        let end = candle_event
+                            .candles
+                            .last()
+                            .expect("Failed to get last candle")
+                            .start;
 
-                        if let Some(&first_trade) = valid_trades.last() {
-                            let end = first_trade.time;
-                            let start = first_trade.time - Duration::minutes(100);
-                            let his_candles = get_product_candle(
-                                trades_msg.symbol,
-                                start.timestamp(),
-                                end.timestamp(),
-                                indicator_bot.timeframe,
-                            );
+                        let start = end - 6000;
 
-                            for candle in his_candles.iter().rev() {
-                                indicator_bot
-                                    .trading_bot
-                                    .one_minute_update(Candlestick::new(
-                                        Utc::now(),
-                                        candle.close,
-                                        candle.volume,
-                                        indicator_bot.timeframe,
-                                    ));
-                            }
-                            indicator_bot.candle = Candlestick::new(
-                                first_trade.time,
-                                first_trade.price,
-                                first_trade.size,
-                                indicator_bot.timeframe,
-                            );
+                        let candles = get_product_candle(message.symbol, start, end);
 
-                            for &trade in valid_trades.iter().rev().skip(1) {
-                                indicator_bot.candle.update(trade.price, trade.size);
-                            }
-
-                            indicator_bot.initialise = false;
-                        }
+                        indicator_bot.initialise = false;
+                        println!("{:?}", candles);
                     } else {
-                        for trade in market_trades.trades.iter().rev() {
-                            if trade.time < indicator_bot.candle.end {
-                                indicator_bot.candle.update(trade.price, trade.size);
-                            } else {
-                                indicator_bot
-                                    .trading_bot
-                                    .one_minute_update(indicator_bot.candle);
-                                println!("Candle: {}", indicator_bot.candle);
-                                let signal = indicator_bot
-                                    .trading_bot
-                                    .get_signal(IndicatorTimeframe::OneMinute);
+                        for candle in candle_event.candles.iter().rev() {
+                            if candle.start != indicator_bot.start {
+                                indicator_bot.trading_bot.one_minute_update(candle.clone());
+                                let signal = indicator_bot.trading_bot.get_signal();
                                 let atr = indicator_bot.trading_bot.get_atr_value();
+                                indicator_bot.start = candle.start;
                                 let _ = account_tx.blocking_send(AccountChannelMessage {
-                                    timeframe: indicator_bot.timeframe,
-                                    symbol: trades_msg.symbol,
-                                    start: indicator_bot.candle.start.timestamp(),
-                                    end: indicator_bot.candle.end.timestamp(),
+                                    symbol: message.symbol,
                                     signal,
-                                    high: indicator_bot.candle.high,
                                     atr,
+                                    high: candle.high,
                                 });
-                                indicator_bot.candle = Candlestick::new(
-                                    trade.time,
-                                    trade.price,
-                                    trade.size,
-                                    indicator_bot.timeframe,
-                                );
                             }
                         }
                     }
@@ -319,8 +272,7 @@ async fn run_bot_account(
                     bot_account.update_balances().await;
                 }
             }
-            if account_msg.timeframe == IndicatorTimeframe::OneMinute
-                && !bot_account.coin_trade_active(account_msg.symbol).await
+            if !bot_account.coin_trade_active(account_msg.symbol).await
                 && account_msg.signal == TradeSignal::Buy
             {
                 bot_account
