@@ -150,6 +150,9 @@ async fn run_websocket(
                                             })
                                             .await;
                                     }
+                                    Event::Candle(candle) => {
+                                        info!("{:?}", candle);
+                                    }
                                 }
                             }
                             Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => (),

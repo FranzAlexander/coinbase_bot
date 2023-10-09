@@ -25,6 +25,8 @@ pub enum Event {
     Heartbeats(Vec<HeartbeatEvent>),
     #[serde(rename = "market_trades")]
     MarketTrades(SmallVec<[MarketTradeEvent; 1]>),
+    #[serde(rename = "candles")]
+    Candle(SmallVec<[CoinbaseCandleEvent; 1]>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -105,12 +107,13 @@ pub struct Order {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CoinbaseCandleEvent {
-    pub candles: Vec<CoinbaseCandle>,
+    pub candles: SmallVec<[CoinbaseCandle; 2]>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CoinbaseCandle {
-    pub start: String,
+    #[serde(with = "string_or_i64")]
+    pub start: i64,
     #[serde(with = "string_or_float")]
     pub low: f64,
     #[serde(with = "string_or_float")]

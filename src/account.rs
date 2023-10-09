@@ -318,5 +318,5 @@ pub fn get_product_candle(
         .json()
         .unwrap();
 
-    ans.candles
+    ans.candles.into_vec()
 }
