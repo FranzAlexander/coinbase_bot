@@ -283,7 +283,7 @@ impl BotAccount {
 
 // -> Vec<Candlestick>
 
-pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) {
+pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) -> CandleHistory {
     let client = reqwest::blocking::Client::new();
     let api_string = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
     let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
@@ -297,7 +297,7 @@ pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) {
         url_string, start, end, "FIVE_MINUTE"
     );
 
-    let ans: Vec<CandleHistory> = client
+    let ans: CandleHistory = client
         .get(url)
         .headers(headers)
         .send()
@@ -305,7 +305,5 @@ pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) {
         .json()
         .unwrap();
 
-    println!("{:?}", ans.len());
-
-    // ans
+    ans
 }

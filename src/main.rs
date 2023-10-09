@@ -208,14 +208,24 @@ fn run_indicator(
                             .candles
                             .last()
                             .expect("Failed to get last candle")
-                            .start;
+                            .start
+                            - 300;
 
-                        let start = end - 6000;
+                        let start = end - 30000;
 
-                        let candles = get_product_candle(message.symbol, start, end);
+                        let his_candles = get_product_candle(message.symbol, start, end);
 
                         indicator_bot.initialise = false;
-                        println!("{:?}", candles);
+
+                        for his_candle in his_candles.candles.into_iter().rev() {
+                            indicator_bot.trading_bot.one_minute_update(his_candle);
+                        }
+
+                        for snap_candle in candle_event.candles.iter().rev() {
+                            indicator_bot
+                                .trading_bot
+                                .one_minute_update(snap_candle.clone());
+                        }
                     } else {
                         for candle in candle_event.candles.iter().rev() {
                             if candle.start != indicator_bot.start {
