@@ -199,7 +199,7 @@ fn run_indicator(
     }
 
     while keep_running.load(Ordering::Relaxed) {
-        while let Some(trades_msg) = indicator_rx.blocking_recv() {
+        if let Some(trades_msg) = indicator_rx.blocking_recv() {
             if let Some(indicator_bot) = trading_indicators.get_mut(&trades_msg.symbol) {
                 for market_trades in trades_msg.trades {
                     // This runs when we first conncet to the websocket to get inital candle,

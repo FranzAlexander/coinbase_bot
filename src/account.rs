@@ -9,6 +9,7 @@ use crate::{
     model::{
         account::{AccountList, Product},
         event::{CoinbaseCandle, CoinbaseCandleEvent},
+        fee::{self, FeeData},
         order::OrderResponse,
         TradeSide,
     },
@@ -21,12 +22,12 @@ pub const WS_URL: &str = "wss://advanced-trade-ws.coinbase.com";
 const ACCOUNT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/accounts";
 const PRODUCT_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/products";
 const ORDER_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/orders";
-// const SUMMARY_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/transaction_summary";
+const SUMMARY_API_URL: &str = "https://api.coinbase.com/api/v3/brokerage/transaction_summary";
 
 const PRODUCT_REQUEST_PATH: &str = "/api/v3/brokerage/products";
 const ACCOUNT_REQUEST_PATH: &str = "/api/v3/brokerage/accounts";
 const ORDER_REQUEST_PATH: &str = "/api/v3/brokerage/orders";
-// const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
+const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
 #[derive(Debug)]
 pub struct BotAccount {
@@ -34,6 +35,8 @@ pub struct BotAccount {
     coins: Arc<Mutex<HashMap<CoinSymbol, Coin>>>,
     api_key: String,
     secret_key: String,
+    market_fee: f64,
+    taker_fee: f64,
 }
 
 impl BotAccount {
@@ -50,11 +53,17 @@ impl BotAccount {
             coins,
             api_key,
             secret_key,
+            market_fee: 0.0,
+            taker_fee: 0.0,
         }
     }
 
     pub async fn update_balances(&mut self) {
         let accounts = self.get_wallet().await;
+
+        let fees = self.get_transaction_summary().await;
+        self.market_fee = fees.fee_tier.maker_fee_rate;
+        self.taker_fee = fees.fee_tier.taker_fee_rate;
 
         for account in accounts.accounts.into_iter() {
             let coin_symbol = self.map_currency_to_symbol(&account.available_balance.currency);
@@ -95,6 +104,20 @@ impl BotAccount {
         send_get_request::<Product>(&self.client, &url, headers)
             .await
             .expect("Failed to get product")
+    }
+
+    async fn get_transaction_summary(&self) -> FeeData {
+        let headers = create_headers(
+            self.secret_key.as_bytes(),
+            &self.api_key,
+            "GET",
+            SUMMARY_REQUEST_PATH,
+            "",
+        );
+
+        send_get_request::<FeeData>(&self.client, SUMMARY_API_URL, headers)
+            .await
+            .expect("Failed to send summary get request!")
     }
 
     pub async fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
@@ -253,7 +276,6 @@ impl BotAccount {
                     high, locked_coin.last_high, locked_coin.stop_loss
                 );
                 return true;
-                // self.create_order(TradeSide::Sell, symbol, atr, high).await;
             }
         }
         false

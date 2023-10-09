@@ -21,7 +21,7 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 const MAX_CROSS_PERIOD: usize = 3;
 const MIN_CANDLE_PROCCESSED: usize = 2;
 
-const ATR_MODIFIER: f64 = 1.0;
+const ATR_MODIFIER: f64 = 1.5;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IndicatorTimeframe {
@@ -88,6 +88,7 @@ pub struct TradingBot {
     atr: Atr,
     count: usize,
     latest_rsi_signals: VecDeque<TradeSignal>,
+    can_trade: bool,
 }
 
 impl TradingBot {
@@ -100,6 +101,7 @@ impl TradingBot {
             atr,
             count: 0,
             latest_rsi_signals: VecDeque::with_capacity(3),
+            can_trade: true,
         }
     }
 
@@ -125,8 +127,14 @@ impl TradingBot {
                 let rsi_signal = self.check_rsi_signal();
                 let macd_signal = self.long_trading.get_macd_signal();
                 if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
+                    if self.can_trade {
+                        self.can_trade = false;
+                    }
                     return TradeSignal::Buy;
                 } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
+                    if !self.can_trade {
+                        self.can_trade = true;
+                    }
                     return TradeSignal::Sell;
                 } else {
                     return TradeSignal::Hold;
