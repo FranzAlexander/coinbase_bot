@@ -17,7 +17,7 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 
 const MAX_CROSS_PERIOD: usize = 3;
 
-const ATR_MODIFIER: f64 = 1.0;
+const ATR_MODIFIER: f64 = 1.1;
 
 #[derive(Debug)]
 #[allow(dead_code)]

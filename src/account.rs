@@ -190,8 +190,10 @@ impl BotAccount {
                     Some(format!("{:.4}", (amount * 100.0).floor() / 100.0))
                 } else if symbol == CoinSymbol::Link {
                     Some(format!("{:.3}", (amount * 100.0).floor() / 100.0))
+                } else if symbol == CoinSymbol::Btc {
+                    Some(format!("{:.2}", (amount * 100.0).floor() / 100.0))
                 } else {
-                    Some(format!("{:.3}", (amount * 100.0)))
+                    None
                 },
                 None,
             ),
@@ -200,8 +202,12 @@ impl BotAccount {
                 None,
                 if symbol == CoinSymbol::Xrp {
                     Some(format!("{:.6}", (amount * 100.0).floor() / 100.0))
+                } else if symbol == CoinSymbol::Link {
+                    Some(format!("{:.3}", (amount * 100.0).floor() / 100.0))
+                } else if symbol == CoinSymbol::Btc {
+                    Some(format!("{:.8}", (amount * 100.0).floor() / 100.0))
                 } else {
-                    Some(format!("{:.3}", amount))
+                    None
                 },
             ),
         }
@@ -241,9 +247,11 @@ impl BotAccount {
         matches!(
             coin_symbol,
             // CoinSymbol::Ada
-            // CoinSymbol::Link
-            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc
-                                                                 // | CoinSymbol::Eth
+            CoinSymbol::Link
+                | CoinSymbol::Usd
+                | CoinSymbol::Usdc
+                | CoinSymbol::Xrp
+                | CoinSymbol::Btc // | CoinSymbol::Eth
         )
     }
 
