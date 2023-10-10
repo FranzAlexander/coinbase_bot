@@ -2,6 +2,7 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use smallvec::SmallVec;
 use uuid::Uuid;
 
 use super::{string_or_float, string_or_i64, OrderStatus, TradeSide};
@@ -21,9 +22,9 @@ pub enum Event {
     #[serde(rename = "subscriptions")]
     Subscriptions(Vec<SubscriptionEvent>),
     #[serde(rename = "heartbeats")]
-    Heartbeats(Vec<HeartbeatEvent>),
+    Heartbeats(SmallVec<[HeartbeatEvent; 1]>),
     #[serde(rename = "candles")]
-    Candle(Vec<CandleEvent>),
+    Candle(SmallVec<[CandleEvent; 1]>),
 }
 
 #[derive(Deserialize, Debug)]
@@ -59,7 +60,7 @@ impl fmt::Display for HeartbeatEvent {
 pub struct UserEvent {
     #[serde(rename = "type")]
     pub event_type: String,
-    pub orders: Vec<Order>,
+    pub orders: SmallVec<[Order; 1]>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -85,7 +86,7 @@ pub struct Order {
 pub struct CandleEvent {
     #[serde(rename = "type")]
     pub event_type: EventType,
-    pub candles: Vec<Candlestick>,
+    pub candles: SmallVec<[Candlestick; 1]>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]

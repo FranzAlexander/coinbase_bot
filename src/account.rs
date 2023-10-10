@@ -8,7 +8,7 @@ use crate::{
     coin::{Coin, CoinSymbol},
     model::{
         account::{AccountList, Product},
-        event::{CandleEvent, CandleHistory, Candlestick},
+        event::CandleHistory,
         fee::FeeData,
         order::OrderResponse,
         TradeSide,
@@ -200,8 +200,6 @@ impl BotAccount {
                 None,
                 if symbol == CoinSymbol::Xrp {
                     Some(format!("{:.6}", (amount * 100.0).floor() / 100.0))
-                } else if symbol == CoinSymbol::Link {
-                    Some(format!("{:.3}", amount))
                 } else {
                     Some(format!("{:.3}", amount))
                 },

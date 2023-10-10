@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::{coin::CoinSymbol, trading_bot::TradeSignal};
 
 use super::event::CandleEvent;
@@ -5,7 +7,7 @@ use super::event::CandleEvent;
 #[derive(Debug)]
 pub struct IndicatorChannelMessage {
     pub symbol: CoinSymbol,
-    pub candles: Vec<CandleEvent>,
+    pub candles: SmallVec<[CandleEvent; 1]>,
 }
 
 #[derive(Debug)]

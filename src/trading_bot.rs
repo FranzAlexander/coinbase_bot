@@ -12,16 +12,12 @@ pub enum TradeSignal {
     Hold,
 }
 
-// Look into price action.
-
 const RSI_OVERSOLD: f64 = 40.0;
 const RSI_OVERBROUGHT: f64 = 60.0;
-// const RSI_CROSS_BUY_CHECK: f64 = 45.0;
 
 const MAX_CROSS_PERIOD: usize = 3;
-const MIN_CANDLE_PROCCESSED: usize = 2;
 
-const ATR_MODIFIER: f64 = 1.5;
+const ATR_MODIFIER: f64 = 1.0;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -75,7 +71,6 @@ impl TradingIndicator {
 pub struct TradingBot {
     long_trading: TradingIndicator,
     atr: Atr,
-    count: usize,
     latest_rsi_signals: VecDeque<TradeSignal>,
     can_trade: bool,
 }
@@ -88,7 +83,6 @@ impl TradingBot {
         TradingBot {
             long_trading,
             atr,
-            count: 0,
             latest_rsi_signals: VecDeque::with_capacity(3),
             can_trade: true,
         }
@@ -104,31 +98,24 @@ impl TradingBot {
 
         self.latest_rsi_signals
             .push_front(self.long_trading.get_rsi_signal());
-
-        if self.count <= MIN_CANDLE_PROCCESSED {
-            self.count += 1;
-        }
     }
 
     pub fn get_signal(&mut self) -> TradeSignal {
-        if self.count > MIN_CANDLE_PROCCESSED {
-            let rsi_signal = self.check_rsi_signal();
-            let macd_signal = self.long_trading.get_macd_signal();
-            if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
-                if self.can_trade {
-                    self.can_trade = false;
-                }
-                return TradeSignal::Buy;
-            } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
-                if !self.can_trade {
-                    self.can_trade = true;
-                }
-                return TradeSignal::Sell;
-            } else {
-                return TradeSignal::Hold;
+        let rsi_signal = self.check_rsi_signal();
+        let macd_signal = self.long_trading.get_macd_signal();
+        if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
+            if self.can_trade {
+                self.can_trade = false;
             }
+            TradeSignal::Buy
+        } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
+            if !self.can_trade {
+                self.can_trade = true;
+            }
+            TradeSignal::Sell
+        } else {
+            TradeSignal::Hold
         }
-        TradeSignal::Hold
     }
 
     pub fn check_rsi_signal(&mut self) -> TradeSignal {

@@ -7,7 +7,6 @@ use std::{
 };
 
 use account::{get_product_candle, BotAccount, WS_URL};
-use chrono::{Duration, Utc};
 use coin::CoinSymbol;
 use futures::StreamExt;
 use model::{event::EventType, TradeSide};
@@ -134,16 +133,8 @@ async fn run_websocket(
                                 match event {
                                     Event::Subscriptions(_) => {}
                                     Event::Heartbeats(heartbeat) => {
-                                        info!("{:?}", heartbeat);
+                                        info!("Heartbeat: {}", heartbeat[0]);
                                     }
-                                    // Event::MarketTrades(market_trades) => {
-                                    //     let _ = indicator_tx
-                                    //         .send(IndicatorChannelMessage {
-                                    //             symbol,
-                                    //             trades: market_trades,
-                                    //         })
-                                    //         .await;
-                                    // }
                                     Event::Candle(candle) => {
                                         let _ = indicator_tx
                                             .send(IndicatorChannelMessage {
@@ -222,14 +213,12 @@ fn run_indicator(
                         }
 
                         for snap_candle in candle_event.candles.iter().rev() {
-                            indicator_bot
-                                .trading_bot
-                                .one_minute_update(snap_candle.clone());
+                            indicator_bot.trading_bot.one_minute_update(*snap_candle);
                         }
                     } else {
                         for candle in candle_event.candles.iter().rev() {
                             if candle.start != indicator_bot.start {
-                                indicator_bot.trading_bot.one_minute_update(candle.clone());
+                                indicator_bot.trading_bot.one_minute_update(*candle);
                                 let signal = indicator_bot.trading_bot.get_signal();
                                 let atr = indicator_bot.trading_bot.get_atr_value();
                                 indicator_bot.start = candle.start;
