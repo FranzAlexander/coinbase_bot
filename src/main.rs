@@ -37,10 +37,7 @@ mod model;
 mod trading_bot;
 mod util;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    setup_logging()?;
-
+fn main() {
     let (indicator_tx, indicator_rx) = mpsc::channel::<IndicatorChannelMessage>(200);
     let (account_tx, account_rx) = mpsc::channel::<AccountChannelMessage>(200);
 
@@ -64,14 +61,6 @@ async fn main() -> anyhow::Result<()> {
     info!("Received shutdown signal. Gracefully terminating...");
 
     keep_running.store(false, Ordering::SeqCst);
-
-    Ok(())
-}
-
-fn setup_logging() -> anyhow::Result<()> {
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber)?;
-    Ok(())
 }
 
 fn launch_websocket_tasks(
