@@ -86,7 +86,7 @@ fn launch_websocket_tasks(
         run_bot_account(&mut account_rx, bot_account_keep_running, position_open).await
     });
 
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
+    let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         let websocket_keep_running = keep_running.clone();
@@ -177,7 +177,7 @@ fn run_indicator(
     _position_open: Arc<Mutex<bool>>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
+    let symbols = [CoinSymbol::Xrp];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(
