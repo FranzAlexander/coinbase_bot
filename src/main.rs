@@ -86,7 +86,7 @@ fn launch_websocket_tasks(
         run_bot_account(&mut account_rx, bot_account_keep_running, position_open).await
     });
 
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc, CoinSymbol::Link];
+    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
 
     for symbol in symbols.into_iter() {
         let websocket_keep_running = keep_running.clone();
@@ -132,8 +132,8 @@ async fn run_websocket(
 
                                 match event {
                                     Event::Subscriptions(_) => {}
-                                    Event::Heartbeats(heartbeat) => {
-                                        info!("Heartbeat: {}", heartbeat[0]);
+                                    Event::Heartbeats(_heartbeat) => {
+                                        // info!("Heartbeat: {}", heartbeat[0]);
                                     }
                                     Event::Candle(candle) => {
                                         let _ = indicator_tx
@@ -177,7 +177,7 @@ fn run_indicator(
     _position_open: Arc<Mutex<bool>>,
 ) {
     let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc, CoinSymbol::Link];
+    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
 
     for symbol in symbols.into_iter() {
         trading_indicators.insert(
@@ -222,6 +222,8 @@ fn run_indicator(
                                 let signal = indicator_bot.trading_bot.get_signal();
                                 let atr = indicator_bot.trading_bot.get_atr_value();
                                 indicator_bot.start = candle.start;
+
+                                println!("CANDLE: {:?}", candle);
                                 let _ = account_tx.blocking_send(AccountChannelMessage {
                                     symbol: message.symbol,
                                     signal,

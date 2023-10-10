@@ -247,11 +247,7 @@ impl BotAccount {
         matches!(
             coin_symbol,
             // CoinSymbol::Ada
-            CoinSymbol::Link
-                | CoinSymbol::Usd
-                | CoinSymbol::Usdc
-                | CoinSymbol::Xrp
-                | CoinSymbol::Btc // | CoinSymbol::Eth
+            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp | CoinSymbol::Btc // | CoinSymbol::Eth
         )
     }
 
@@ -286,8 +282,6 @@ impl BotAccount {
         false
     }
 }
-
-// -> Vec<Candlestick>
 
 pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) -> CandleHistory {
     let client = reqwest::blocking::Client::new();
