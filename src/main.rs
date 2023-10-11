@@ -156,7 +156,7 @@ fn handle_signal(
             bot_account.update_balances(symbol);
         }
     }
-    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy && trader_can_trade {
+    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy {
         bot_account.create_order(TradeSide::Buy, symbol, indicator_result.atr.unwrap());
         bot_account.update_balances(symbol);
     }
