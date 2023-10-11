@@ -1,6 +1,6 @@
 [package]
 name = "coinbase"
-version = "0.9.7"
+version = "0.9.8"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,8 +10,6 @@ inherits = "release"
 lto = true
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = { version = "*", features = ["tls"] }
 url = "*"
 futures = "*"
 serde = { version = "*", features = ["derive"] }
@@ -29,4 +27,5 @@ reqwest = { version = "0.11.20", features = ["json","blocking"] }
 anyhow = "1.0.75"
 uuid = { version = "1.4.1", features = ["v4", "serde"] }
 smallvec = { version = "*", features = ["serde"]}
-tungstenite = "*"
+tungstenite = { version = "*", features = ["native-tls"] }
+native-tls="*"

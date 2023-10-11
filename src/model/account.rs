@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::string_or_float;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AccountType {
     #[serde(rename = "ACCOUNT_TYPE_UNSPECIFIED")]
     Unspecified,
@@ -20,6 +20,11 @@ pub struct AccountList {
     pub has_next: bool,
     pub cursor: Option<String>,
     pub size: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SingleAccount {
+    pub account: Account,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

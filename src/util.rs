@@ -1,17 +1,18 @@
-use futures::SinkExt;
+use crate::coin::CoinSymbol;
 use hmac::{Hmac, Mac};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde_json::json;
 use sha2::Sha256;
-use tokio::net::TcpStream;
-use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
-
-use crate::coin::CoinSymbol;
 
 type HmacSha256 = Hmac<Sha256>;
 
-pub async fn subscribe(
-    ws_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+pub fn subscribe(
+    ws_stream: &mut tungstenite::WebSocket<
+        tungstenite::stream::Stream<
+            std::net::TcpStream,
+            native_tls::TlsStream<std::net::TcpStream>,
+        >,
+    >,
     market: &str,
     event: &str,
 ) {
@@ -32,8 +33,7 @@ pub async fn subscribe(
         });
 
         ws_stream
-            .send(Message::Text(subscribe_msg.to_string()))
-            .await
+            .write_message(tungstenite::Message::Text(subscribe_msg.to_string()))
             .unwrap();
     }
 }

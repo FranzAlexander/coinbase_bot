@@ -73,7 +73,7 @@ pub struct TradingBot {
     atr: Atr,
     latest_rsi_signals: VecDeque<TradeSignal>,
     can_trade: bool,
-    pub start: i64,
+    pub candle: Candlestick,
     pub initialise: bool,
 }
 
@@ -87,8 +87,15 @@ impl TradingBot {
             atr,
             latest_rsi_signals: VecDeque::with_capacity(3),
             can_trade: true,
-            start: 0,
-            initialise: true,
+            candle: Candlestick {
+                start: 0,
+                low: 0.0,
+                high: 0.0,
+                open: 0.0,
+                close: 0.0,
+                volume: 0.0,
+            },
+            initialise: false,
         }
     }
 
