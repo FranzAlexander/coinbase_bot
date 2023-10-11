@@ -141,6 +141,10 @@ impl TradingBot {
     pub fn get_atr_value(&self) -> Option<f64> {
         self.atr.get_atr().map(|atr| atr * ATR_MODIFIER)
     }
+
+    pub fn get_can_trade(&self) -> bool {
+        self.can_trade
+    }
 }
 
 pub struct IndicatorResult {

@@ -30,6 +30,9 @@ const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
 const XRP_SELL_PLACES: i32 = 6;
 const XRP_BUY_PLACES: i32 = 4;
+const BTC_SELL_PLACES: i32 = 8;
+const BTC_BUY_PLACES: i32 = 8;
+
 const USDC_BUY_PLACES: i32 = 2;
 
 #[derive(Debug)]
@@ -260,81 +263,6 @@ impl BotAccount {
         self.truncate_to_decimal_places(new_value, places)
     }
 
-    // pub async fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
-    //     let price = self.get_product(symbol).await;
-
-    //     let client_order_id = Uuid::new_v4().to_string();
-
-    //     let amount = self.get_currency_amount(order_type, symbol).await;
-
-    //     let (quote_size, base_size) = self.get_order_size(order_type, symbol, amount);
-
-    //     let product_id = format!(
-    //         "{}-{}",
-    //         String::from(symbol),
-    //         String::from(CoinSymbol::Usdc)
-    //     );
-
-    //     let body = serde_json::json!({
-    //         "client_order_id": client_order_id,
-    //         "product_id":product_id,
-    //         "side": order_type,
-    //         "order_configuration":{
-    //             "market_market_ioc":{
-    //                 "quote_size":  quote_size,
-    //                 "base_size":  base_size
-    //             }
-    //         }
-    //     });
-
-    //     let headers = create_headers(
-    //         self.secret_key.as_bytes(),
-    //         &self.api_key,
-    //         "POST",
-    //         ORDER_REQUEST_PATH,
-    //         &body.to_string(),
-    //     );
-
-    //     let order: OrderResponse = self
-    //         .client
-    //         .post(ORDER_API_URL)
-    //         .headers(headers)
-    //         .json(&body)
-    //         .send()
-    //         .await
-    //         .expect("Failed to send order")
-    //         .json()
-    //         .await
-    //         .expect("Failed to read json");
-
-    //     if order.success {
-    //         let mut locked_coins = self.coins.lock().await;
-    //         let coin = locked_coins.get_mut(&symbol).unwrap();
-    //         match order_type {
-    //             TradeSide::Buy => {
-    //                 coin.update_coin(true, price.price - atr, price.price);
-    //             }
-    //             TradeSide::Sell => coin.update_coin(false, 0.0, 0.0),
-    //         }
-    //     }
-    // }
-
-    // async fn get_currency_amount(&self, order_type: TradeSide, symbol: CoinSymbol) -> f64 {
-    //     if order_type == TradeSide::Buy {
-    //         let mut count = 0;
-    //         let locked_coins = self.coins.lock().await;
-    //         for coin in locked_coins.iter() {
-    //             if !coin.1.active_trade {
-    //                 count += 1;
-    //             }
-    //         }
-    //         locked_coins.get(&CoinSymbol::Usdc).unwrap().balance / (count - 1) as f64
-    //     } else {
-    //         let locked_coins = self.coins.lock().await;
-    //         locked_coins.get(&symbol).unwrap().balance
-    //     }
-    // }
-
     fn map_currency_to_symbol(&self, currency: &str) -> CoinSymbol {
         match currency {
             "ADA" => CoinSymbol::Ada,
@@ -353,7 +281,7 @@ impl BotAccount {
         matches!(
             coin_symbol,
             // CoinSymbol::Ada
-            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp // | CoinSymbol::Btc // | CoinSymbol::Eth
+            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp | CoinSymbol::Btc // | CoinSymbol::Eth
         )
     }
 
@@ -362,10 +290,12 @@ impl BotAccount {
             TradeSide::Buy => match coin_symbol {
                 CoinSymbol::Usdc => USDC_BUY_PLACES,
                 CoinSymbol::Xrp => XRP_BUY_PLACES,
+                CoinSymbol::Btc => BTC_BUY_PLACES,
                 _ => 0,
             },
             TradeSide::Sell => match coin_symbol {
                 CoinSymbol::Xrp => XRP_SELL_PLACES,
+                CoinSymbol::Btc => BTC_SELL_PLACES,
                 _ => 0,
             },
         }
@@ -395,32 +325,6 @@ impl BotAccount {
         }
         false
     }
-
-    // pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) -> bool {
-    //     let mut coins_guard = self.coins.lock().await;
-    //     // Step 2: Borrow the value from the HashMap through the guard.
-    //     if let Some(locked_coin) = coins_guard.get_mut(&symbol) {
-    //         // Note the use of get_mut here
-
-    //         if high > locked_coin.last_high {
-    //             locked_coin.update_coin(true, high - atr, high);
-
-    //             info!(
-    //                 "HIGH: {}, LAST HIGH: {}, STOP LOSS:{}",
-    //                 high, locked_coin.last_high, locked_coin.stop_loss
-    //             );
-    //         }
-
-    //         if high <= locked_coin.stop_loss {
-    //             info!(
-    //                 "SELL, HIGH: {}, LAST HIGH: {}, STOP LOSS:{}",
-    //                 high, locked_coin.last_high, locked_coin.stop_loss
-    //             );
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
 }
 
 pub fn get_product_candle(symbol: CoinSymbol, start: i64, end: i64) -> CandleHistory {

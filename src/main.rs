@@ -17,15 +17,11 @@ use model::{
 };
 use smallvec::SmallVec;
 
-use tracing::{error, event, info, Level};
 use trading_bot::{IndicatorResult, TradeSignal, TradingBot};
 use tungstenite::{connect, Message};
 use util::{market_subcribe_string, subscribe};
 
-use crate::model::{
-    channel::{AccountChannelMessage, IndicatorChannelMessage},
-    event::Event,
-};
+use crate::model::event::Event;
 
 mod account;
 mod coin;
@@ -37,7 +33,7 @@ mod util;
 fn main() {
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    let symbols = [CoinSymbol::Xrp];
+    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
     for symbol in symbols.into_iter() {
@@ -75,7 +71,12 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                     Event::Candle(candles) => {
                         let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                         if let Some(res) = indicator_result {
-                            handle_signal(symbol, res, &mut account_bot);
+                            handle_signal(
+                                symbol,
+                                res,
+                                &mut account_bot,
+                                trading_bot.get_can_trade(),
+                            );
                         }
                     }
                 }
@@ -142,6 +143,7 @@ fn handle_signal(
     symbol: CoinSymbol,
     indicator_result: IndicatorResult,
     bot_account: &mut BotAccount,
+    trader_can_trade: bool,
 ) {
     println!("Current Signal: {:?}", indicator_result.signal);
 
@@ -151,53 +153,11 @@ fn handle_signal(
 
         if should_sell {
             bot_account.create_order(TradeSide::Sell, symbol, indicator_result.atr.unwrap());
+            bot_account.update_balances(symbol);
         }
     }
-    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy {
+    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy && trader_can_trade {
         bot_account.create_order(TradeSide::Buy, symbol, indicator_result.atr.unwrap());
+        bot_account.update_balances(symbol);
     }
 }
-
-// async fn run_bot_account(
-//     account_rx: &mut Receiver<AccountChannelMessage>,
-//     keep_running: Arc<AtomicBool>,
-//     _position_open: Arc<Mutex<bool>>,
-// ) {
-//     let mut bot_account = BotAccount::new();
-
-//     bot_account.update_balances().await;
-
-//     while keep_running.load(Ordering::Relaxed) {
-//         while let Some(account_msg) = account_rx.recv().await {
-//             info!("CURRENT SIGNAL: {:?}", account_msg.signal);
-//             if bot_account.coin_trade_active(account_msg.symbol).await {
-//                 let sell = bot_account
-//                     .update_coin_position(
-//                         account_msg.symbol,
-//                         account_msg.high,
-//                         account_msg.atr.unwrap(),
-//                     )
-//                     .await;
-
-//                 if sell {
-//                     bot_account
-//                         .create_order(
-//                             TradeSide::Sell,
-//                             account_msg.symbol,
-//                             account_msg.atr.unwrap(),
-//                         )
-//                         .await;
-//                     bot_account.update_balances().await;
-//                 }
-//             }
-//             if !bot_account.coin_trade_active(account_msg.symbol).await
-//                 && account_msg.signal == TradeSignal::Buy
-//             {
-//                 bot_account
-//                     .create_order(TradeSide::Buy, account_msg.symbol, account_msg.atr.unwrap())
-//                     .await;
-//                 bot_account.update_balances().await;
-//             }
-//         }
-//     }
-// }
