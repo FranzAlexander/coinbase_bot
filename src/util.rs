@@ -52,18 +52,12 @@ fn sign_message(message: &str) -> String {
     format!("{:x}", mac.finalize().into_bytes())
 }
 
-pub async fn send_get_request<T: for<'de> serde::Deserialize<'de>>(
-    client: &reqwest::Client,
+pub fn send_get_request<T: for<'de> serde::Deserialize<'de>>(
+    client: &reqwest::blocking::Client,
     url: &str,
     headers: HeaderMap,
 ) -> Result<T, reqwest::Error> {
-    client
-        .get(url)
-        .headers(headers)
-        .send()
-        .await?
-        .json::<T>()
-        .await
+    client.get(url).headers(headers).send().unwrap().json::<T>()
 }
 
 pub fn http_sign(

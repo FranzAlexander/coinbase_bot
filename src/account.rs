@@ -30,8 +30,8 @@ const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
 #[derive(Debug)]
 pub struct BotAccount {
-    client: reqwest::Client,
-    coins: Arc<Mutex<HashMap<CoinSymbol, Coin>>>,
+    client: reqwest::blocking::Client,
+    coins: HashMap<CoinSymbol, Coin>,
     api_key: String,
     secret_key: String,
     market_fee: f64,
@@ -44,8 +44,8 @@ impl BotAccount {
         let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
         let secret_key = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
 
-        let client = reqwest::Client::new();
-        let coins = Arc::new(Mutex::new(HashMap::new()));
+        let client = reqwest::blocking::Client::new();
+        let coins = HashMap::new();
 
         BotAccount {
             client,
@@ -57,18 +57,17 @@ impl BotAccount {
         }
     }
 
-    pub async fn update_balances(&mut self) {
-        let accounts = self.get_wallet().await;
+    pub fn update_balances(&mut self) {
+        let accounts = self.get_wallet();
 
-        let fees = self.get_transaction_summary().await;
+        let fees = self.get_transaction_summary();
         self.market_fee = fees.fee_tier.maker_fee_rate;
         self.taker_fee = fees.fee_tier.taker_fee_rate;
 
         for account in accounts.accounts.into_iter() {
             let coin_symbol = self.map_currency_to_symbol(&account.available_balance.currency);
             if self.is_valid_coin(&coin_symbol) {
-                let mut locked_coins = self.coins.lock().await;
-                match locked_coins.entry(coin_symbol) {
+                match self.coins.entry(coin_symbol) {
                     std::collections::hash_map::Entry::Vacant(e) => {
                         e.insert(Coin::new(account.available_balance.value, false, 0.0, 0.0));
                     }
@@ -80,7 +79,7 @@ impl BotAccount {
         }
     }
 
-    async fn get_wallet(&self) -> AccountList {
+    fn get_wallet(&self) -> AccountList {
         let headers = create_headers(
             self.secret_key.as_bytes(),
             &self.api_key,
@@ -90,22 +89,19 @@ impl BotAccount {
         );
 
         send_get_request::<AccountList>(&self.client, ACCOUNT_API_URL, headers)
-            .await
             .expect("Failed to send get request!")
     }
 
-    pub async fn get_product(&self, symbol: CoinSymbol) -> Product {
+    pub fn get_product(&self, symbol: CoinSymbol) -> Product {
         let path = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_REQUEST_PATH);
 
         let headers = create_headers(self.secret_key.as_bytes(), &self.api_key, "GET", &path, "");
         let url = get_api_string(symbol, CoinSymbol::Usdc, PRODUCT_API_URL);
 
-        send_get_request::<Product>(&self.client, &url, headers)
-            .await
-            .expect("Failed to get product")
+        send_get_request::<Product>(&self.client, &url, headers).expect("Failed to get product")
     }
 
-    async fn get_transaction_summary(&self) -> FeeData {
+    fn get_transaction_summary(&self) -> FeeData {
         let headers = create_headers(
             self.secret_key.as_bytes(),
             &self.api_key,
@@ -115,7 +111,6 @@ impl BotAccount {
         );
 
         send_get_request::<FeeData>(&self.client, SUMMARY_API_URL, headers)
-            .await
             .expect("Failed to send summary get request!")
     }
 
@@ -251,9 +246,8 @@ impl BotAccount {
         )
     }
 
-    #[inline]
-    pub async fn coin_trade_active(&self, symbol: CoinSymbol) -> bool {
-        self.coins.lock().await.get(&symbol).unwrap().active_trade
+    pub fn coin_trade_active(&self, symbol: CoinSymbol) -> bool {
+        self.coins.get(&symbol).unwrap().active_trade
     }
 
     pub async fn update_coin_position(&mut self, symbol: CoinSymbol, high: f64, atr: f64) -> bool {

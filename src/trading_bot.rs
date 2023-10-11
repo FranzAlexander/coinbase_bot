@@ -73,6 +73,8 @@ pub struct TradingBot {
     atr: Atr,
     latest_rsi_signals: VecDeque<TradeSignal>,
     can_trade: bool,
+    pub start: i64,
+    pub initialise: bool,
 }
 
 impl TradingBot {
@@ -85,6 +87,8 @@ impl TradingBot {
             atr,
             latest_rsi_signals: VecDeque::with_capacity(3),
             can_trade: true,
+            start: 0,
+            initialise: true,
         }
     }
 
@@ -132,8 +136,8 @@ impl TradingBot {
     }
 }
 
-pub struct IndicatorGroup {
-    pub trading_bot: TradingBot,
-    pub start: i64,
-    pub initialise: bool,
+pub struct IndicatorResult {
+    pub signal: TradeSignal,
+    pub atr: Option<f64>,
+    pub high: f64,
 }

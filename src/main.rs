@@ -7,9 +7,14 @@ use std::{
 };
 
 use account::{get_product_candle, BotAccount, WS_URL};
+use anyhow::bail;
 use coin::CoinSymbol;
 use futures::StreamExt;
-use model::{event::EventType, TradeSide};
+use model::{
+    event::{CandleEvent, CandleHistory, EventType},
+    TradeSide,
+};
+use smallvec::SmallVec;
 use tokio::{
     sync::{
         mpsc::{self, Receiver, Sender},
@@ -17,9 +22,9 @@ use tokio::{
     },
     task::spawn_blocking,
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{error, event, info, Level};
-use trading_bot::{IndicatorGroup, TradeSignal, TradingBot};
+use trading_bot::{IndicatorGroup, IndicatorResult, TradeSignal, TradingBot};
+use tungstenite::{connect, Message};
 use util::market_subcribe_string;
 
 use crate::{
@@ -38,29 +43,38 @@ mod trading_bot;
 mod util;
 
 fn main() {
-    let (indicator_tx, indicator_rx) = mpsc::channel::<IndicatorChannelMessage>(200);
-    let (account_tx, account_rx) = mpsc::channel::<AccountChannelMessage>(200);
-
-    let position_open = Arc::new(Mutex::new(false));
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    launch_processing_tasks(
-        indicator_rx,
-        account_tx.clone(),
-        keep_running.clone(),
-        position_open.clone(),
-    );
-    launch_websocket_tasks(
-        indicator_tx,
-        account_rx,
-        keep_running.clone(),
-        position_open.clone(),
-    );
+    let symbols = [CoinSymbol::Xrp];
+}
 
-    tokio::signal::ctrl_c().await?;
-    info!("Received shutdown signal. Gracefully terminating...");
+fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
+    let mut trading_bot = TradingBot::new();
+    let mut account_bot = BotAccount::new();
+    account_bot.update_balances();
 
-    keep_running.store(false, Ordering::SeqCst);
+    let (mut socket, _) = connect(WS_URL).expect("Failed to connect to socket");
+
+    while keep_running.load(Ordering::Relaxed) {
+        let message = socket.read_message().unwrap();
+        match message {
+            Message::Text(msg) => {
+                let event: Event = serde_json::from_str(&msg).unwrap();
+
+                match event {
+                    Event::Subscriptions(_) => (),
+                    Event::Heartbeats(_) => (),
+                    Event::Candle(candles) => {
+                        let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
+                        if let Some(res) = indicator_result {}
+                    }
+                }
+            }
+            Message::Ping(_) => socket.write_message(Message::Pong(vec![])).unwrap(),
+            Message::Binary(_) | Message::Pong(_) => (),
+            Message::Close(e) => println!("Websocket closed: {:?}", e),
+        }
+    }
 }
 
 fn launch_websocket_tasks(
@@ -89,144 +103,72 @@ fn launch_websocket_tasks(
     }
 }
 
-fn launch_processing_tasks(
-    mut indicator_rx: Receiver<IndicatorChannelMessage>,
-    account_tx: Sender<AccountChannelMessage>,
-    keep_running: Arc<AtomicBool>,
-    position_open: Arc<Mutex<bool>>,
-) {
-    spawn_blocking(move || {
-        run_indicator(&mut indicator_rx, account_tx, keep_running, position_open)
-    });
-}
-
-async fn run_websocket(
+fn handle_candle(
+    candles: SmallVec<[CandleEvent; 1]>,
+    trading_bot: &mut TradingBot,
     symbol: CoinSymbol,
-    market: String,
-    keep_running: Arc<AtomicBool>,
-    indicator_tx: Sender<IndicatorChannelMessage>,
-) {
-    while keep_running.load(Ordering::Relaxed) {
-        match connect_async(WS_URL).await {
-            Ok((mut ws_stream, _)) => {
-                info!("Connected to server!");
+) -> Option<IndicatorResult> {
+    for candle_event in candles.iter() {
+        if candle_event.event_type == EventType::Snapshot && !trading_bot.initialise {
+            let hist_candles =
+                get_history_candles(symbol, candle_event.candles.last().unwrap().start);
 
-                subscribe(&mut ws_stream, &market, "subscribe").await;
+            trading_bot.initialise = true;
 
-                while let Some(msg) = ws_stream.next().await {
-                    match msg {
-                        Ok(event_msg) => match event_msg {
-                            Message::Text(text) => {
-                                let event: Event = serde_json::from_str(&text).unwrap();
-
-                                match event {
-                                    Event::Subscriptions(_) => {}
-                                    Event::Heartbeats(_heartbeat) => {
-                                        // info!("Heartbeat: {}", heartbeat[0]);
-                                    }
-                                    Event::Candle(candle) => {
-                                        let _ = indicator_tx
-                                            .send(IndicatorChannelMessage {
-                                                symbol,
-                                                candles: candle,
-                                            })
-                                            .await;
-                                    }
-                                }
-                            }
-                            Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => (),
-                            Message::Close(e) => {
-                                info!("Connection closed: {:?}", e)
-                            }
-                        },
-                        Err(e) => {
-                            error!("Error with websocket: {:?}", e)
-                        }
-                    }
-                }
+            for hist_candle in hist_candles.candles.into_iter().rev() {
+                trading_bot.one_minute_update(hist_candle);
             }
-            Err(e) => {
-                event!(
-                    Level::ERROR,
-                    "Failed to connect to {}: {}. Retrying in {} seconds...",
-                    WS_URL,
-                    e,
-                    3
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+            for snap_candle in candle_event.candles.into_iter().rev() {
+                trading_bot.one_minute_update(snap_candle);
+            }
+            return None;
+        } else {
+            for candle in candle_event.candles.into_iter() {
+                if candle.start != trading_bot.start {
+                    println!("Candle: {:?}", candle);
+                    let signal = trading_bot.get_signal();
+                    let atr = trading_bot.get_atr_value();
+                    trading_bot.start = candle.start;
+
+                    return Some(IndicatorResult {
+                        signal,
+                        atr,
+                        high: candle.high,
+                    });
+                }
             }
         }
     }
+
+    None
 }
 
-fn run_indicator(
-    indicator_rx: &mut Receiver<IndicatorChannelMessage>,
-    account_tx: Sender<AccountChannelMessage>,
-    keep_running: Arc<AtomicBool>,
-    _position_open: Arc<Mutex<bool>>,
+fn get_history_candles(symbol: CoinSymbol, recent_start: i64) -> CandleHistory {
+    let end = recent_start - 300;
+    let start = end - 30000;
+
+    get_product_candle(symbol, start, end)
+}
+
+fn handle_signal(
+    symbol: CoinSymbol,
+    indicator_result: IndicatorResult,
+    bot_account: &mut BotAccount,
 ) {
-    let mut trading_indicators: HashMap<CoinSymbol, IndicatorGroup> = HashMap::new();
-    let symbols = [CoinSymbol::Xrp];
+    println!("Current Signal: {:?}", indicator_result.signal);
 
-    for symbol in symbols.into_iter() {
-        trading_indicators.insert(
+    if bot_account.coin_trade_active(symbol) {
+        let should_sell = bot_account.update_coin_position(
             symbol,
-            IndicatorGroup {
-                trading_bot: TradingBot::new(),
-                start: 0,
-                initialise: true,
-            },
+            indicator_result.high,
+            indicator_result.atr.unwrap(),
         );
+
+        // Add sell code here.
     }
-
-    while keep_running.load(Ordering::Relaxed) {
-        if let Some(message) = indicator_rx.blocking_recv() {
-            if let Some(indicator_bot) = trading_indicators.get_mut(&message.symbol) {
-                for candle_event in message.candles.iter() {
-                    if candle_event.event_type == EventType::Snapshot && indicator_bot.initialise {
-                        let end = candle_event
-                            .candles
-                            .last()
-                            .expect("Failed to get last candle")
-                            .start
-                            - 300;
-
-                        let start = end - 30000;
-
-                        let his_candles = get_product_candle(message.symbol, start, end);
-
-                        indicator_bot.initialise = false;
-
-                        for his_candle in his_candles.candles.into_iter().rev() {
-                            indicator_bot.trading_bot.one_minute_update(his_candle);
-                        }
-
-                        for snap_candle in candle_event.candles.iter().rev() {
-                            indicator_bot.trading_bot.one_minute_update(*snap_candle);
-                        }
-                    } else {
-                        for candle in candle_event.candles.iter().rev() {
-                            if candle.start != indicator_bot.start {
-                                indicator_bot.trading_bot.one_minute_update(*candle);
-                                let signal = indicator_bot.trading_bot.get_signal();
-                                let atr = indicator_bot.trading_bot.get_atr_value();
-                                indicator_bot.start = candle.start;
-
-                                println!("CANDLE: {:?}", candle);
-                                let _ = account_tx.blocking_send(AccountChannelMessage {
-                                    symbol: message.symbol,
-                                    signal,
-                                    atr,
-                                    high: candle.high,
-                                });
-                            }
-                        }
-                    }
-                }
-            } else {
-                println!("Symbol not found");
-            }
-        }
+    if !bot_account.coin_trade_active(symbol) && indicator_result.signal == TradeSignal::Buy {
+        // Add buy code here.
     }
 }
 
