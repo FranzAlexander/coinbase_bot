@@ -56,8 +56,6 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
     let mut account_bot = BotAccount::new();
     account_bot.update_balances(symbol);
 
-    account_bot.create_order(TradeSide::Sell, symbol, 0.0);
-
     let (mut socket, _) = connect(WS_URL).expect("Failed to connect to socket");
 
     let market_string =
