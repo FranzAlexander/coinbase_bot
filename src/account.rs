@@ -257,8 +257,7 @@ impl BotAccount {
         let value = self.get_account(order_type).account.available_balance.value;
 
         let new_value = if order_type == TradeSide::Buy {
-            // value / self.div_num as f64
-            value / 5.0
+            value / self.div_num as f64
         } else {
             value
         };
