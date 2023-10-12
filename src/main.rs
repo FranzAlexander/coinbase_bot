@@ -71,15 +71,9 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                         Event::Subscriptions(_) => (),
                         Event::Heartbeats(_) => (),
                         Event::Candle(candles) => {
-                            println!("Candle: {:?}", candles[0].candles);
                             let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                             if let Some(res) = indicator_result {
-                                handle_signal(
-                                    symbol,
-                                    res,
-                                    &mut account_bot,
-                                    trading_bot.get_can_trade(),
-                                );
+                                handle_signal(symbol, res, &mut account_bot);
                             }
                         }
                     }
@@ -140,6 +134,7 @@ fn handle_candle(
         if candle_event.event_type == EventType::Update {
             for candle in candle_event.candles.iter() {
                 if candle.start != trading_bot.candle.start {
+                    println!("{:?}", trading_bot.candle);
                     trading_bot.one_minute_update(trading_bot.candle);
                     let signal = trading_bot.get_signal();
                     let atr = trading_bot.get_atr_value();
@@ -171,7 +166,6 @@ fn handle_signal(
     symbol: CoinSymbol,
     indicator_result: IndicatorResult,
     bot_account: &mut BotAccount,
-    trader_can_trade: bool,
 ) {
     println!("Current Signal: {:?}", indicator_result.signal);
 

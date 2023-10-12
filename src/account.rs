@@ -31,7 +31,7 @@ const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 const XRP_SELL_PLACES: i32 = 6;
 const XRP_BUY_PLACES: i32 = 4;
 const BTC_SELL_PLACES: i32 = 8;
-const BTC_BUY_PLACES: i32 = 8;
+const BTC_BUY_PLACES: i32 = 2;
 
 const USDC_BUY_PLACES: i32 = 2;
 
@@ -183,6 +183,8 @@ impl BotAccount {
 
         let amount = self.get_currency_amount(order_type, symbol);
 
+        println!("Amount: {}", amount);
+
         let mut quote_size: Option<String>;
         let mut base_size: Option<String>;
 
@@ -255,7 +257,8 @@ impl BotAccount {
         let value = self.get_account(order_type).account.available_balance.value;
 
         let new_value = if order_type == TradeSide::Buy {
-            value / self.div_num as f64
+            // value / self.div_num as f64
+            value / 5.0
         } else {
             value
         };
