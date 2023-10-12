@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -8,9 +7,7 @@ use std::{
 };
 
 use account::{get_product_candle, BotAccount, WS_URL};
-use anyhow::bail;
 use coin::CoinSymbol;
-use futures::StreamExt;
 use model::{
     event::{CandleEvent, CandleHistory, EventType},
     TradeSide,
@@ -54,36 +51,65 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
 
     let (mut socket, _) = connect(WS_URL).expect("Failed to connect to socket");
 
+    println!("Connected to server!");
+
     let market_string =
         market_subcribe_string(&String::from(symbol), &String::from(CoinSymbol::Usdc));
 
     subscribe(&mut socket, &market_string, "subscribe");
 
-    while keep_running.load(Ordering::Relaxed) {
-        let message = socket.read_message().unwrap();
-        match message {
-            Message::Text(msg) => {
-                let event: Event = serde_json::from_str(&msg).unwrap();
+    let mut backoff_time = 1;
 
-                match event {
-                    Event::Subscriptions(_) => (),
-                    Event::Heartbeats(_) => (),
-                    Event::Candle(candles) => {
-                        let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
-                        if let Some(res) = indicator_result {
-                            handle_signal(
-                                symbol,
-                                res,
-                                &mut account_bot,
-                                trading_bot.get_can_trade(),
-                            );
+    while keep_running.load(Ordering::Relaxed) {
+        match socket.read_message() {
+            Ok(message) => match message {
+                Message::Text(msg) => {
+                    backoff_time = 1;
+                    let event: Event = serde_json::from_str(&msg).unwrap();
+
+                    match event {
+                        Event::Subscriptions(_) => (),
+                        Event::Heartbeats(_) => (),
+                        Event::Candle(candles) => {
+                            let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
+                            if let Some(res) = indicator_result {
+                                handle_signal(
+                                    symbol,
+                                    res,
+                                    &mut account_bot,
+                                    trading_bot.get_can_trade(),
+                                );
+                            }
                         }
                     }
                 }
+                Message::Ping(_) => socket.write_message(Message::Pong(vec![])).unwrap(),
+                Message::Binary(_) | Message::Pong(_) => (),
+                Message::Close(e) => println!("Websocket closed: {:?}", e),
+            },
+            Err(_) => {
+                println!(
+                    "Connection lost. Reconnecting in {} seconds...",
+                    backoff_time
+                );
+                std::thread::sleep(std::time::Duration::from_secs(backoff_time));
+
+                backoff_time = (backoff_time * 2).min(60); // Double the backoff time, but cap it at 60 seconds
+                let connection_result = connect(WS_URL);
+                if let Ok((new_socket, _)) = connection_result {
+                    socket = new_socket;
+                    println!("Successfully reconnected!");
+
+                    // Re-subscribe after reconnecting
+                    let market_string = market_subcribe_string(
+                        &String::from(symbol),
+                        &String::from(CoinSymbol::Usdc),
+                    );
+                    subscribe(&mut socket, &market_string, "subscribe");
+                } else {
+                    println!("Failed to reconnect. Will try again...");
+                }
             }
-            Message::Ping(_) => socket.write_message(Message::Pong(vec![])).unwrap(),
-            Message::Binary(_) | Message::Pong(_) => (),
-            Message::Close(e) => println!("Websocket closed: {:?}", e),
         }
     }
 }
