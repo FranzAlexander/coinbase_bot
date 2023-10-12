@@ -117,9 +117,7 @@ impl TradingBot {
         if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
             TradeSignal::Buy
         } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
-            if !self.can_trade {
-                self.can_trade = true;
-            }
+            self.can_trade = true;
             TradeSignal::Sell
         } else {
             TradeSignal::Hold
