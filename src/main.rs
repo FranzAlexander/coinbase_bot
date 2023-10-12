@@ -71,6 +71,7 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                         Event::Subscriptions(_) => (),
                         Event::Heartbeats(_) => (),
                         Event::Candle(candles) => {
+                            println!("Candle: {:?}", candles[0].candles);
                             let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                             if let Some(res) = indicator_result {
                                 handle_signal(
@@ -178,11 +179,13 @@ fn handle_signal(
             bot_account.update_coin_position(indicator_result.high, indicator_result.atr.unwrap());
 
         if should_sell {
+            println!("Closing Open Position");
             bot_account.create_order(TradeSide::Sell, symbol, indicator_result.atr.unwrap());
             bot_account.update_balances(symbol);
         }
     }
     if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy {
+        println!("Entering Open Position");
         bot_account.create_order(TradeSide::Buy, symbol, indicator_result.atr.unwrap());
         bot_account.update_balances(symbol);
     }
