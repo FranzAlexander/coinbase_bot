@@ -136,7 +136,8 @@ fn handle_candle(
                 trading_bot.candle = *snap_candle;
             }
             return None;
-        } else {
+        }
+        if candle_event.event_type == EventType::Update {
             for candle in candle_event.candles.iter() {
                 if candle.start != trading_bot.candle.start {
                     trading_bot.one_minute_update(trading_bot.candle);
