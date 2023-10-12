@@ -30,8 +30,12 @@ const SUMMARY_REQUEST_PATH: &str = "/api/v3/brokerage/transaction_summary";
 
 const XRP_SELL_PLACES: i32 = 6;
 const XRP_BUY_PLACES: i32 = 4;
+
 const BTC_SELL_PLACES: i32 = 8;
 const BTC_BUY_PLACES: i32 = 2;
+
+const ETH_SELL_PLACES: i32 = 8;
+const ETH_BUY_PLACES: i32 = 2;
 
 const USDC_BUY_PLACES: i32 = 2;
 
@@ -178,7 +182,7 @@ impl BotAccount {
         send_get_request::<SingleAccount>(&self.client, &url_string, headers).unwrap()
     }
 
-    pub fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
+    pub fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64, high: f64) {
         let client_order_id = Uuid::new_v4().to_string();
 
         let amount = self.get_currency_amount(order_type, symbol);
@@ -204,8 +208,6 @@ impl BotAccount {
             String::from(symbol),
             String::from(CoinSymbol::Usdc)
         );
-
-        let price = self.get_product(symbol);
 
         let body = serde_json::json!({
             "client_order_id": client_order_id,
@@ -241,8 +243,8 @@ impl BotAccount {
             match order_type {
                 TradeSide::Buy => {
                     self.can_trade = false;
-                    self.stop_loss = price.price - atr;
-                    self.last_high = price.price;
+                    self.stop_loss = high - atr;
+                    self.last_high = high;
                 }
                 TradeSide::Sell => {
                     self.can_trade = true;
@@ -283,7 +285,11 @@ impl BotAccount {
         matches!(
             coin_symbol,
             // CoinSymbol::Ada
-            CoinSymbol::Usd | CoinSymbol::Usdc | CoinSymbol::Xrp | CoinSymbol::Btc // | CoinSymbol::Eth
+            CoinSymbol::Usd
+                | CoinSymbol::Usdc
+                | CoinSymbol::Xrp
+                | CoinSymbol::Btc
+                | CoinSymbol::Eth
         )
     }
 
@@ -293,11 +299,13 @@ impl BotAccount {
                 CoinSymbol::Usdc => USDC_BUY_PLACES,
                 CoinSymbol::Xrp => XRP_BUY_PLACES,
                 CoinSymbol::Btc => BTC_BUY_PLACES,
+                CoinSymbol::Eth => ETH_BUY_PLACES,
                 _ => 0,
             },
             TradeSide::Sell => match coin_symbol {
                 CoinSymbol::Xrp => XRP_SELL_PLACES,
                 CoinSymbol::Btc => BTC_SELL_PLACES,
+                CoinSymbol::Eth => ETH_SELL_PLACES,
                 _ => 0,
             },
         }

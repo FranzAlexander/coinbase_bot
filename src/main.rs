@@ -30,7 +30,7 @@ mod util;
 fn main() {
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc];
+    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc, CoinSymbol::Eth];
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
     for symbol in symbols.into_iter() {
@@ -73,7 +73,16 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                         Event::Candle(candles) => {
                             let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                             if let Some(res) = indicator_result {
-                                handle_signal(symbol, res, &mut account_bot);
+                                let (side, can_trade) = handle_signal(
+                                    symbol,
+                                    res,
+                                    &mut account_bot,
+                                    trading_bot.get_can_trade(),
+                                );
+
+                                if side == TradeSide::Buy {
+                                    trading_bot.set_can_trade(can_trade);
+                                }
                             }
                         }
                     }
@@ -166,7 +175,8 @@ fn handle_signal(
     symbol: CoinSymbol,
     indicator_result: IndicatorResult,
     bot_account: &mut BotAccount,
-) {
+    can_trade: bool,
+) -> (TradeSide, bool) {
     println!("Current Signal: {:?}", indicator_result.signal);
 
     if !bot_account.can_trade() {
@@ -175,13 +185,27 @@ fn handle_signal(
 
         if should_sell {
             println!("Closing Open Position");
-            bot_account.create_order(TradeSide::Sell, symbol, indicator_result.atr.unwrap());
+            bot_account.create_order(
+                TradeSide::Sell,
+                symbol,
+                indicator_result.atr.unwrap(),
+                indicator_result.high,
+            );
             bot_account.update_balances(symbol);
+            return (TradeSide::Sell, true);
         }
     }
-    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy {
+    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy && can_trade {
         println!("Entering Open Position");
-        bot_account.create_order(TradeSide::Buy, symbol, indicator_result.atr.unwrap());
+        bot_account.create_order(
+            TradeSide::Buy,
+            symbol,
+            indicator_result.atr.unwrap(),
+            indicator_result.high,
+        );
         bot_account.update_balances(symbol);
+        return (TradeSide::Buy, false);
     }
+
+    (TradeSide::Sell, false)
 }

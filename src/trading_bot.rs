@@ -28,7 +28,7 @@ pub struct TradingIndicator {
 
 impl TradingIndicator {
     pub fn new() -> Self {
-        let macd = Macd::new(12, 21, 9);
+        let macd = Macd::new(9, 12, 7);
         let rsi = Rsi::new(14);
 
         TradingIndicator { macd, rsi }
@@ -115,9 +115,6 @@ impl TradingBot {
         let rsi_signal = self.check_rsi_signal();
         let macd_signal = self.long_trading.get_macd_signal();
         if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
-            if self.can_trade {
-                self.can_trade = false;
-            }
             TradeSignal::Buy
         } else if rsi_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
             if !self.can_trade {
@@ -144,6 +141,10 @@ impl TradingBot {
 
     pub fn get_can_trade(&self) -> bool {
         self.can_trade
+    }
+
+    pub fn set_can_trade(&mut self, can_trade: bool) {
+        self.can_trade = can_trade
     }
 }
 
