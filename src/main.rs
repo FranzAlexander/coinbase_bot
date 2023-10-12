@@ -73,6 +73,7 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                         Event::Candle(candles) => {
                             let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                             if let Some(res) = indicator_result {
+                                println!("CAN TRADE: {}", trading_bot.get_can_trade());
                                 handle_signal(symbol, res, &mut account_bot, &mut trading_bot);
                             }
                         }
