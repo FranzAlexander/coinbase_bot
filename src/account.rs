@@ -182,7 +182,7 @@ impl BotAccount {
         send_get_request::<SingleAccount>(&self.client, &url_string, headers).unwrap()
     }
 
-    pub fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64, high: f64) {
+    pub fn create_order(&mut self, order_type: TradeSide, symbol: CoinSymbol, atr: f64) {
         let client_order_id = Uuid::new_v4().to_string();
 
         let amount = self.get_currency_amount(order_type, symbol);
@@ -208,6 +208,8 @@ impl BotAccount {
             String::from(symbol),
             String::from(CoinSymbol::Usdc)
         );
+
+        let price = self.get_product(symbol);
 
         let body = serde_json::json!({
             "client_order_id": client_order_id,
@@ -243,8 +245,8 @@ impl BotAccount {
             match order_type {
                 TradeSide::Buy => {
                     self.can_trade = false;
-                    self.stop_loss = high - atr;
-                    self.last_high = high;
+                    self.stop_loss = price.price - atr;
+                    self.last_high = price.price;
                 }
                 TradeSide::Sell => {
                     self.can_trade = true;

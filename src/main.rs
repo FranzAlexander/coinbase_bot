@@ -185,24 +185,14 @@ fn handle_signal(
 
         if should_sell {
             println!("Closing Open Position");
-            bot_account.create_order(
-                TradeSide::Sell,
-                symbol,
-                indicator_result.atr.unwrap(),
-                indicator_result.high,
-            );
+            bot_account.create_order(TradeSide::Sell, symbol, indicator_result.atr.unwrap());
             bot_account.update_balances(symbol);
             return (TradeSide::Sell, true);
         }
     }
     if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy && can_trade {
         println!("Entering Open Position");
-        bot_account.create_order(
-            TradeSide::Buy,
-            symbol,
-            indicator_result.atr.unwrap(),
-            indicator_result.high,
-        );
+        bot_account.create_order(TradeSide::Buy, symbol, indicator_result.atr.unwrap());
         bot_account.update_balances(symbol);
         return (TradeSide::Buy, false);
     }
