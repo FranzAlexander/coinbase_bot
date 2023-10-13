@@ -39,9 +39,12 @@ fn main() {
     ];
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
+    let num_symbols = symbols.len();
+
     for symbol in symbols.into_iter() {
         let coin_keep_running = keep_running.clone();
-        let handle = thread::spawn(move || coin_trading_task(coin_keep_running, symbol));
+        let handle =
+            thread::spawn(move || coin_trading_task(coin_keep_running, symbol, num_symbols));
         handles.push(handle);
     }
 
@@ -50,9 +53,9 @@ fn main() {
     }
 }
 
-fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
+fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol, num_symbols: usize) {
     let mut trading_bot = TradingBot::new();
-    let mut account_bot = BotAccount::new();
+    let mut account_bot = BotAccount::new(num_symbols);
     account_bot.update_balances(symbol);
 
     let (mut socket, _) = connect(WS_URL).expect("Failed to connect to socket");

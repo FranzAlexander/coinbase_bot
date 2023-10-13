@@ -61,7 +61,7 @@ pub struct BotAccount {
 }
 
 impl BotAccount {
-    pub fn new() -> Self {
+    pub fn new(num_symbols: usize) -> Self {
         dotenv::dotenv().ok();
         let api_key = std::env::var("API_KEY").expect("API_KEY not found in environment");
         let secret_key = std::env::var("API_SECRET").expect("SECRET_KEY not found in environment");
@@ -74,7 +74,7 @@ impl BotAccount {
             secret_key,
             market_fee: 0.0,
             taker_fee: 0.0,
-            div_num: 0,
+            div_num: num_symbols,
             can_trade: true,
             symbol_id: None,
             usdc_id: None,
@@ -110,12 +110,11 @@ impl BotAccount {
                 // Checks to see if current amount held is 0.
                 let value = self.check_coin_amount(coin_symbol, account.available_balance.value);
 
-                // Check to see if there is any coin amount held by account.
-                if value <= 0.0 {
-                    self.div_num += 1;
+                if value > 0.0 {
+                    self.div_num -= 1;
                 } else {
-                    if self.div_num > 1 {
-                        self.div_num -= 1;
+                    if self.div_num < 5 {
+                        self.div_num += 1;
                     }
                 }
             }
