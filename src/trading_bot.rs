@@ -1,7 +1,12 @@
 use std::collections::VecDeque;
 
 use crate::{
-    indicators::{atr::Atr, ema::Ema, macd::Macd, rsi::Rsi},
+    indicators::{
+        atr::Atr,
+        ema::Ema,
+        macd::{self, Macd},
+        rsi::Rsi,
+    },
     model::event::Candlestick,
 };
 
@@ -17,15 +22,13 @@ const RSI_OVERBROUGHT: f64 = 60.0;
 
 const MAX_CROSS_PERIOD: usize = 3;
 
-const ATR_MODIFIER: f64 = 1.0;
+const ATR_MODIFIER: f64 = 1.25;
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct TradingIndicator {
     macd: Macd,
-    // rsi: Rsi,
-    short_ema: Ema,
-    long_ema: Ema,
+    price_ema: Ema, // rsi: Rsi,
 }
 
 // Used to use macd and rsi.
@@ -35,20 +38,14 @@ impl TradingIndicator {
     pub fn new() -> Self {
         let macd = Macd::new(12, 21, 9);
         // let rsi = Rsi::new(14);
-        let short_ema = Ema::new(9);
-        let long_ema = Ema::new(12);
+        let price_ema = Ema::new(20);
 
-        TradingIndicator {
-            macd,
-            short_ema,
-            long_ema,
-        }
+        TradingIndicator { macd, price_ema }
     }
 
     pub fn update(&mut self, current_price: f64) {
         self.macd.update(current_price);
-        self.short_ema.update(current_price);
-        self.long_ema.update(current_price);
+        self.price_ema.update(current_price);
     }
 
     // pub fn get_rsi_signal(&self) -> TradeSignal {
@@ -78,18 +75,30 @@ impl TradingIndicator {
         }
     }
 
-    pub fn get_ema_cross(&self) -> TradeSignal {
-        let short_ema = self.short_ema.get_ema();
-        let long_ema = self.long_ema.get_ema();
+    pub fn get_ema_signal(&self, price: f64) -> TradeSignal {
+        let current_ema = self.price_ema.get_ema();
 
-        if short_ema > long_ema {
+        if current_ema < price {
             TradeSignal::Buy
-        } else if short_ema < long_ema {
+        } else if current_ema > price {
             TradeSignal::Sell
         } else {
             TradeSignal::Hold
         }
     }
+
+    // pub fn get_ema_cross(&self) -> TradeSignal {
+    //     let short_ema = self.short_ema.get_ema();
+    //     let long_ema = self.long_ema.get_ema();
+
+    //     if short_ema > long_ema {
+    //         TradeSignal::Buy
+    //     } else if short_ema < long_ema {
+    //         TradeSignal::Sell
+    //     } else {
+    //         TradeSignal::Hold
+    //     }
+    // }
 }
 
 #[derive(Debug)]
@@ -100,6 +109,7 @@ pub struct TradingBot {
     can_trade: bool,
     pub candle: Candlestick,
     pub initialise: bool,
+    pub lastest_macd_signals: VecDeque<TradeSignal>,
 }
 
 impl TradingBot {
@@ -121,12 +131,20 @@ impl TradingBot {
                 volume: 0.0,
             },
             initialise: false,
+            lastest_macd_signals: VecDeque::with_capacity(5),
         }
     }
 
     pub fn one_minute_update(&mut self, candle: Candlestick) {
         self.long_trading.update(candle.close);
         self.atr.update(candle.high, candle.low, candle.close);
+
+        if self.lastest_macd_signals.len() > 5 {
+            self.lastest_macd_signals.pop_back();
+        }
+
+        self.lastest_macd_signals
+            .push_front(self.long_trading.get_macd_signal());
 
         // if self.latest_rsi_signals.len() > MAX_CROSS_PERIOD {
         //     self.latest_rsi_signals.pop_back();
@@ -136,7 +154,7 @@ impl TradingBot {
         //     .push_front(self.long_trading.get_rsi_signal());
     }
 
-    pub fn get_signal(&mut self) -> TradeSignal {
+    pub fn get_signal(&mut self, price: f64) -> TradeSignal {
         // let rsi_signal = self.check_rsi_signal();
         // let macd_signal = self.long_trading.get_macd_signal();
         // if rsi_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
@@ -148,16 +166,25 @@ impl TradingBot {
         //     TradeSignal::Hold
         // }
 
-        let ema_cross = self.long_trading.get_ema_cross();
-        let macd_signal = self.long_trading.get_macd_signal();
+        let ema_signal = self.long_trading.get_ema_signal(price);
+        let macd_signal = self.check_macd_signal();
 
-        if ema_cross == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
+        if ema_signal == TradeSignal::Buy && macd_signal == TradeSignal::Buy {
             TradeSignal::Buy
-        } else if ema_cross == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
+        } else if ema_signal == TradeSignal::Sell && macd_signal == TradeSignal::Sell {
             self.can_trade = true;
             TradeSignal::Sell
         } else {
             TradeSignal::Hold
+        }
+    }
+
+    fn check_macd_signal(&self) -> TradeSignal {
+        let macd_singal = self.lastest_macd_signals.contains(&TradeSignal::Buy);
+        if macd_singal {
+            TradeSignal::Buy
+        } else {
+            *self.lastest_macd_signals.back().unwrap()
         }
     }
 

@@ -143,7 +143,7 @@ fn handle_candle(
                 if candle.start != trading_bot.candle.start {
                     println!("{:?}", trading_bot.candle);
                     trading_bot.one_minute_update(trading_bot.candle);
-                    let signal = trading_bot.get_signal();
+                    let signal = trading_bot.get_signal(trading_bot.candle.close);
                     let atr = trading_bot.get_atr_value();
                     trading_bot.candle = *candle;
 
