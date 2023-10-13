@@ -37,6 +37,12 @@ const BTC_BUY_PLACES: i32 = 2;
 const ETH_SELL_PLACES: i32 = 8;
 const ETH_BUY_PLACES: i32 = 2;
 
+const LINK_SELL_PLACES: i32 = 2;
+const LINK_BUY_PLACES: i32 = 3;
+
+const LITE_SELL_PLACES: i32 = 8;
+const LITE_BUY_PLACES: i32 = 2;
+
 const USDC_BUY_PLACES: i32 = 2;
 
 #[derive(Debug)]
@@ -105,7 +111,7 @@ impl BotAccount {
                 let value = self.check_coin_amount(coin_symbol, account.available_balance.value);
 
                 // Check to see if there is any coin amount held by account.
-                if value == 0.0 {
+                if value <= 0.0 {
                     self.div_num += 1;
                 } else {
                     if self.div_num > 1 {
@@ -276,6 +282,7 @@ impl BotAccount {
             "XRP" => CoinSymbol::Xrp,
             "BTC" => CoinSymbol::Btc,
             "ETH" => CoinSymbol::Eth,
+            "LTC" => CoinSymbol::Ltc,
             // Add any other coin mappings here
             _ => CoinSymbol::Unknown,
         }
@@ -290,6 +297,8 @@ impl BotAccount {
                 | CoinSymbol::Xrp
                 | CoinSymbol::Btc
                 | CoinSymbol::Eth
+                | CoinSymbol::Link
+                | CoinSymbol::Ltc
         )
     }
 
@@ -300,12 +309,16 @@ impl BotAccount {
                 CoinSymbol::Xrp => XRP_BUY_PLACES,
                 CoinSymbol::Btc => BTC_BUY_PLACES,
                 CoinSymbol::Eth => ETH_BUY_PLACES,
+                CoinSymbol::Link => LINK_BUY_PLACES,
+                CoinSymbol::Ltc => LITE_BUY_PLACES,
                 _ => 0,
             },
             TradeSide::Sell => match coin_symbol {
                 CoinSymbol::Xrp => XRP_SELL_PLACES,
                 CoinSymbol::Btc => BTC_SELL_PLACES,
                 CoinSymbol::Eth => ETH_SELL_PLACES,
+                CoinSymbol::Link => LINK_SELL_PLACES,
+                CoinSymbol::Ltc => LITE_SELL_PLACES,
                 _ => 0,
             },
         }

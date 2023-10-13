@@ -11,6 +11,7 @@ pub enum CoinSymbol {
     Link,
     Btc,
     Eth,
+    Ltc,
     #[serde(other)]
     Unknown,
 }
@@ -25,6 +26,7 @@ impl From<CoinSymbol> for String {
             CoinSymbol::Xrp => "XRP",
             CoinSymbol::Btc => "BTC",
             CoinSymbol::Eth => "ETH",
+            CoinSymbol::Ltc => "LTC",
             _ => "NA",
         })
     }
@@ -42,6 +44,7 @@ impl FromStr for CoinSymbol {
             "XRP" => Ok(CoinSymbol::Xrp),
             "BTC" => Ok(CoinSymbol::Btc),
             "ETH" => Ok(CoinSymbol::Eth),
+            "LTC" => Ok(CoinSymbol::Ltc),
             _ => Err(()),
         }
     }

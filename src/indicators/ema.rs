@@ -37,6 +37,10 @@ impl Ema {
 
         self.current
     }
+
+    pub fn get_ema(&self) -> f64 {
+        self.current.unwrap_or(0.0)
+    }
 }
 
 impl fmt::Display for Ema {

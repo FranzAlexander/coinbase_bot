@@ -30,7 +30,13 @@ mod util;
 fn main() {
     let keep_running = Arc::new(AtomicBool::new(true));
 
-    let symbols = [CoinSymbol::Xrp, CoinSymbol::Btc, CoinSymbol::Eth];
+    let symbols = [
+        CoinSymbol::Xrp,
+        CoinSymbol::Btc,
+        CoinSymbol::Eth,
+        CoinSymbol::Link,
+        CoinSymbol::Ltc,
+    ];
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
     for symbol in symbols.into_iter() {
@@ -74,7 +80,7 @@ fn coin_trading_task(keep_running: Arc<AtomicBool>, symbol: CoinSymbol) {
                             let indicator_result = handle_candle(candles, &mut trading_bot, symbol);
                             if let Some(res) = indicator_result {
                                 println!("CAN TRADE: {}", trading_bot.get_can_trade());
-                                handle_signal(symbol, res, &mut account_bot);
+                                handle_signal(symbol, res, &mut account_bot, &mut trading_bot);
                             }
                         }
                     }
@@ -167,6 +173,7 @@ fn handle_signal(
     symbol: CoinSymbol,
     indicator_result: IndicatorResult,
     bot_account: &mut BotAccount,
+    trading_bot: &mut TradingBot,
 ) {
     println!("Current Signal: {:?}", indicator_result.signal);
 
@@ -185,7 +192,10 @@ fn handle_signal(
             bot_account.update_balances(symbol);
         }
     }
-    if bot_account.can_trade() && indicator_result.signal == TradeSignal::Buy {
+    if bot_account.can_trade()
+        && indicator_result.signal == TradeSignal::Buy
+        && trading_bot.get_can_trade()
+    {
         println!("Entering Open Position");
         bot_account.create_order(
             TradeSide::Buy,
@@ -193,6 +203,7 @@ fn handle_signal(
             indicator_result.atr.unwrap(),
             indicator_result.high,
         );
+        trading_bot.set_can_trade(false);
         bot_account.update_balances(symbol);
     }
 }
